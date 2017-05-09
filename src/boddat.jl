@@ -2310,7 +2310,7 @@ for ti in 1:n12-1#only do mnt at a time
   url = url*@sprintf("&CENTER='%s@%d%s'&MAKE_EPHEM='YES'",coord,cb,llstr)
   url = url*@sprintf("&TABLE_TYPE='VECTORS'%s&OUT_UNITS='KM-S'",tstr)
   url = url*"&VECT_TABLE='2'&REF_PLANE='ECLIPTIC'&REF_SYSTEM='J2000'"
-  url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'&OBJ_DATA='NOPE'"
+  #url = url*"&OBJ_DATA='NOPE'" # Originally included but errors out
   #url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'"
   s = download(url) #run horizons url command and extract goodies
   f = open(s); rd = readlines(f); close(f)
