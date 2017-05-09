@@ -200,7 +200,7 @@ if isempty(param(dict,"bva"))
         "j2","rotation_period","reference","date","mag","occ","types",
         "close_approach"]
   bva = [bva;ov]
-  ov2 = copy(ov)
+  ov2 = identity(ov)
   for jj in 1:3
     for ii in 1:length(ov)
       (jj == 1) && (ov2[ii] = ov[ii]*"dcm")
@@ -222,7 +222,7 @@ for jj in ii
 end
 
 if (isempty(find(x->(typeof(x)==String),bi)))
-  be=copy(bi)
+  be=identity(bi)
 else
   be=getnum(bi,dict)
 end
@@ -240,7 +240,7 @@ end #if size(be,1)>2;be=be';end;b=be(1,:);
 #for each parameter input call the appropriate funciton and write
 #result to varargout
 if typeof(bvars) == String
-  bvars = [copy(bvars)]
+  bvars = [identity(bvars)]
   nvars = 1
 else
   nvars = length(bvars)
@@ -337,7 +337,7 @@ for bvr in 1:nvars
     if isempty(jj)
       a = cb
     else
-      a = copy(bi)
+      a = identity(bi)
       for ib in 1:length(bi)
         if T1[ib]
           a[ib] = cb[ib]
@@ -443,10 +443,10 @@ mb = param(dict,"mb")
 (typeof(bi)!=String) && (b = Array(Any,length(bi)))
 for ib in 1:length(bi)
   if typeof(bi[ib])!=String
-    b[ib] = copy(convert(Int64,bi[ib]))
+    b[ib] = identity(convert(Int64,bi[ib]))
     continue
   else
-    bib = copy(bi[ib])
+    bib = identity(bi[ib])
   end
   if contains(bi[ib],"_CP")
     nbcp = true
@@ -511,7 +511,7 @@ function getnumout{T}(bi::AbstractArray{T},dict::Dict)
 
 bo = zeros(length(bi))
 for ib in 1:length(bi)
-  b1=copy(bi[ib])
+  b1=identity(bi[ib])
   if imag(b1) != 0
     nbcp=true
     b1=real(b1)
@@ -604,7 +604,7 @@ function getgm(bs::AbstractArray{Int64},dict::Dict)
 #   density and size
 gmx=zeros(length(bs))
 for jj in 1:length(bs)
-  b=copy(bs[jj])
+  b=identity(bs[jj])
   (imag(b)!=0) && (gm=NaN)
   (imag(b)==0) && (gm=getx(b,"gm",dict)) #check saved data (& no ssd flag)
   if (!isempty(gm)) && (gm !=NaN)#found it
@@ -931,7 +931,7 @@ for jj=1:length(bs)
       T2 = getnum([T1],dict)
       cad[ii,2] = T2[1]
     end
-    LastNum = copy(T1)
+    LastNum = identity(T1)
 
     lns = match(r"size=\"-2\">",rd[lne[ii]+4])
     ln = match(r"</font>",rd[lne[ii]+4])
@@ -1027,7 +1027,7 @@ it = collect(1:length(bb))
 ct = collect(2:length(bb))
 for ii in 1:length(bb)-1
   sp = 1
-  T1 = copy(ct)
+  T1 = identity(ct)
   for jj in ct
     if bb[ii] == bb[jj]
       splice!(T1,sp)
@@ -1036,7 +1036,7 @@ for ii in 1:length(bb)-1
     end
     sp = sp + 1
   end
-  ct = copy(T1)
+  ct = identity(T1)
   (isempty(ct)) && (continue)
 end
 
@@ -1110,7 +1110,7 @@ for ibu in 1:length(bb)
   X=pp[1:3] #X = pole, cl2 is Pole|PM|eqx output
   if ll>1
     #need X = pole node
-    P=copy(X)
+    P=identity(X)
     p12=sqrt(P[1]^2+P[2]^2)
     X=[P[2]/p12;-P[1]/p12; 0*p12]
     #if ll>1;P=X;X=cross(qorient(399,0,1),P);X=X/sqrt(sum(X.*X));#need X = pole node
@@ -1188,7 +1188,7 @@ it = collect(1:1:size(b,2))
 ct = collect(2:1:size(b,2))
 for ii in 1:size(b,2)-1
   sp = 1
-  T1 = copy(ct)
+  T1 = identity(ct)
   for jj in ct
     if (isnan(b[2,ii]))
       if (b[1,ii] == b[1,jj]) && (isnan(b[2,jj]))
@@ -1205,7 +1205,7 @@ for ii in 1:size(b,2)-1
     end
     sp = sp + 1
   end
-  ct = copy(T1)
+  ct = identity(T1)
   (isempty(ct)) && (continue)
 end
 
@@ -1240,7 +1240,7 @@ for ibu in 1:size(b,2)
     if tb
       tt=[t[ibu]]
     else
-      tt=copy(t)
+      tt=identity(t)
       if isempty(sizeof(tt))
         tt = [tt]
       end
@@ -1779,7 +1779,7 @@ it = collect(1:length(bb))
 ct = collect(2:length(bb))
 for ii in 1:length(bb)-1
   sp = 1
-  T1 = copy(ct)
+  T1 = identity(ct)
   for jj in ct
     if bb[ii] == bb[jj]
       splice!(T1,sp)
@@ -1788,7 +1788,7 @@ for ii in 1:length(bb)-1
     end
     sp = sp + 1
   end
-  ct = copy(T1)
+  ct = identity(T1)
   (isempty(ct)) && (continue)
 end
 
@@ -1852,7 +1852,7 @@ for ibu in 1:length(bb) #match times for each unique body
     jj = []
     ij = []
   end
-  any(x->(x==cl2),jj) ? (ii = copy(ij)) : (ii = [])
+  any(x->(x==cl2),jj) ? (ii = identity(ij)) : (ii = [])
   ssd=param(dict,"ssd")
   if isempty(ii)||ssd#read from file or horizons
     if ssd #te is saved time span
@@ -1910,7 +1910,7 @@ for ibu in 1:length(bb) #match times for each unique body
       if cl2==1 #X is pole node, Pole x [0;0;1]
         di=[td;X[1:2,:]]
         if ll==2
-          P=copy(X)
+          P=identity(X)
           for jj in 1:size(X,2)
             X[1,jj] = P[2,jj]
             X[2,jj] = -P[1,jj]
@@ -2089,7 +2089,7 @@ for ibu in 1:length(bb) #match times for each unique body
     end
   end
   if cl2==div(ll,2) #dcm
-    XT = copy(X); X = zeros(9,size(X,2))
+    XT = identity(X); X = zeros(9,size(X,2))
     for jj in 1:size(X,2)
       XP = cross(P[:,jj],XT[:,jj])
       for kk in 1:3
@@ -2320,7 +2320,7 @@ for ti in 1:n12-1#only do mnt at a time
     (contains(rd[i1],"\$\$SOE")) && (T1 = false)
     (i1 == mx) && (T1 = false)
   end
-  T1 = true; i2 = copy(i1)
+  T1 = true; i2 = identity(i1)
   (i2==mx) && (T1=false)
   while T1
     i2 = i2 + 1
@@ -2456,7 +2456,7 @@ if (isempty(ed)) && (b<400) #inner planets and barycenters
   T1 = split(rd[ii[end]+1:jj[1]-1])  #read in variable names (each 6 chars)
   vars = Array(AbstractString,length(T1)-1)
   for ii in 1:length(T1)-1
-    vars[ii] = copy(T1[ii+1])
+    vars[ii] = identity(T1[ii+1])
   end
 
   T1 = split(rd[jj[end]+1:kk[1]-1])  #read in variable names (each 6 chars)
@@ -2587,7 +2587,7 @@ if isempty(tephf.numbers)
         ssT[ii] = ss.captures[ii]
       end
       if isempty(sss)
-        sss = copy(ssT)
+        sss = identity(ssT)
       else
         sss = [sss; ssT]
       end
@@ -2685,7 +2685,7 @@ if isempty(tephf.numbers)
         (ssT[ii][6:8]=="Dec") && (ssT[ii]=ssT[ii][1:5]*"12"*ssT[ii][9:end])
       end
       if isempty(ss1)
-        ss1 = copy(ssT)
+        ss1 = identity(ssT)
       else
         ss1 = [ss1; ssT]
       end
@@ -2828,7 +2828,7 @@ end
 
 #b = vcat(nums[1:10],nums[15:20],nums[22:23],nums[24:50],nums[160:end])
 x,_=getsbmb("mb",dict)
-b=copy(x.numbers)
+b=identity(x.numbers)
 jj = [] # see if body numbers already exist in data structure
 for ii in 1:length(b)
   T1 = find(x->(x==b[ii]),nums)
@@ -2992,7 +2992,7 @@ function getsbmb(n,dict::Dict)
 if typeof(n)!=String #should be 'mb' or 'sb'
   if n<1e6; bi="mb"; else; bi="sb"; end#convert number input to sb mb
 else
-  bi=copy(n)
+  bi=identity(n)
 end
 bo=param(dict,bi)
 if (bo == []) && (bi == "mb")#read from saved data
