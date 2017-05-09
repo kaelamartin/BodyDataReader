@@ -219,22 +219,18 @@ ii = find(x->(typeof(x)==SubString{ASCIIString}),bi)
 for jj in ii
    bi[jj] = bi[jj]*""
 end
-if !isempty(bi)
   if (isempty(find(x->(typeof(x)==ASCIIString),bi)))
-    be=copy(bi)
-  else
-    be=getnum(bi,dict)
-  end
-  b = zeros(Int64,length(be))
-  for ii in 1:length(be)
-    b[ii]=convert(Int64,be[ii])
-  end #if size(be,1)>2;be=be';end;b=be(1,:);
+
+if (isempty(find(x->(typeof(x)==ASCIIString),bi)))
+  be=copy(bi)
 else
-  for ii in 1:size(varargout,1)
-    varargout=[]
-  end
-  return varargout
+  be=getnum(bi,dict)
 end
+b = zeros(Int64,length(be))
+for ii in 1:length(be)
+  b[ii]=convert(Int64,be[ii])
+end
+
 #input body parameter variables, if not a cell array then cellstr or split by
 # comma, semicolon, space & or |
 #if ~iscell(bvars);if size(bvars,1)>1;bvars=cellstr(bvars);else;
@@ -243,10 +239,9 @@ end
 #if strcmpi(bvars{1},'all');bvars=cellstr(params('bva'));end
 #for each parameter input call the appropriate funciton and write
 #result to varargout
+
 if typeof(bvars) == ASCIIString
-  T1 = copy(bvars)
-  bvars = Array(ASCIIString,1)
-  bvars[1] = copy(T1)
+  bvars = [copy(bvars)]
   nvars = 1
 else
   nvars = length(bvars)
@@ -254,14 +249,33 @@ end
 for bvr in 1:nvars
   bvi = []
   bvar=bvars[bvr]
-  inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+  if length(bvar)==1
+    inBVA = find(x->(contains(x,bvar)),param(dict,"bva")[1:4])
+  else
+    inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+  end
   (!isempty(inBVA)) && (inBVA = inBVA[1])
   #find out which member of bva matches input
+  if isempty(inBVA)
+    bvar = uppercase(bvar)
+    inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+    (!isempty(inBVA)) && (inBVA = inBVA[1])
+    if is empty(inBVA)
+      bvar = lowercase(bvar)
+      inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+      (!isempty(inBVA)) && (inBVA = inBVA[1])
+      if isempty(inBVA)
+        bvar = ucfirst(bvar)
+        inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+        (!isempty(inBVA)) && (inBVA = inBVA[1])
+      end
+    end
+  end
   (isempty(inBVA)) && (inBVA = 0)
-  if (isempty(bvi)) && (inBVA > 4)
+  if (inBVA > 4)
     T1=uniqstr(param(dict,"bva"),bvar)
     bvi = T1[1]
-  elseif (isempty(bvi)) && (inBVA <= 4)
+  elseif (inBVA <= 4)
     bvi = inBVA
   end
   if isempty(bvi)
@@ -701,7 +715,7 @@ for jj in 1:length(bs)
     end
   end
   (length(r)>1) && (r = r[1]) # could be removed wiht other error checking
-  rx[jj]=r[1] #dev: r->r[1]
+  rx[jj]=r
 end#for
 return rx
 end
@@ -2223,7 +2237,7 @@ end
 #tt is expected time output from horizons, can only run 400 times in list,
 # or 90,000 times in {start,end,delta}
 if !typ
-  ist = sortperm(collect(t)) #dev add collect to force collumn vector
+  ist = sortperm(t)
   tt = t[ist]
   mnt=400
 else
@@ -2291,8 +2305,8 @@ for ti in 1:n12-1#only do mnt at a time
   url = url*@sprintf("&CENTER='%s@%d%s'&MAKE_EPHEM='YES'",coord,cb,llstr)
   url = url*@sprintf("&TABLE_TYPE='VECTORS'%s&OUT_UNITS='KM-S'",tstr)
   url = url*"&VECT_TABLE='2'&REF_PLANE='ECLIPTIC'&REF_SYSTEM='J2000'"
-  url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'&OBJ_DATA='NOPE'"
-  #url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'"
+  # url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'&OBJ_DATA='NOPE'"
+  url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'"
   s = download(url) #run horizons url command and extract goodies
   f = open(s); rd = readlines(f); close(f)
   mx = length(rd); i1 = 0; T1 = true
@@ -2899,16 +2913,11 @@ if ss != 0:-1
   nnf = [nnf a]
   ss1 = search(rd,r">spec_T<.*?>")
   if ss1 != 0:-1
-    ss2 = search(rd[ss1[end]:end],r">([\w])</")
-    if ss2!= 0:-1 #dev
-        a = rd[ss1[end]+ss2[1]:ss1[end]+ss2[end]-3]
-    else
-        a = [];
-    end
+    ss2 = search(rd[ss1[end]:end],r">(\D+)</")
+    a = rd[ss1[end]+ss2[1]:ss1[end]+ss2[end]-10]
     (isempty(a)) && (a="")
   else
-    a=""
-  end
+    a=warnend
   ss1 = search(rd,r">spec_B<.*?>")
   if ss1 != 0:-1
     ss2 = search(rd[ss1[end]:end],r">(\w+)</")
@@ -2995,9 +3004,9 @@ else
   n=n[1]
 end
 if isempty(bb) #see if body exists in field
-  bb=length(x.numbers)+1
-  f=["numbers" f]
-  (size(v,2) > size(v,1))? (v = [n v]) : (v = [n; v])
+    bb=length(x.numbers)+1
+    f=["numbers" f]
+    (size(v,2) > size(v,1))? (v = [n v]) : (v = [n; v])
 end
 
 if typeof(f) == ASCIIString
@@ -3016,9 +3025,9 @@ for ii in 1:flds
   end
   if typeof(v[ii])==ASCIIString || (typeof(v[ii])==SubString{UTF8String})
     #pad with spaces, then write
-    if isempty(x.(Nm))
-      x.(Nm) = Array(AbstractString,length(x.numbers))
-    end
+    # if isempty(x.(Nm))
+    #   x.(Nm) = Array(AbstractString,length(x.numbers))
+    # end
     for jj in bb
       push!(x.(Nm), v[ii])
     end
