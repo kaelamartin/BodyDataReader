@@ -1361,7 +1361,7 @@ if isempty(ii)
     end#no good data
   else
     f=load(efile)
-    di=f["d"]
+    di=identity(f["d"])
   end#file exists, read data, 1st two entries is data size
 
   if cb!=10#gives better accuracy for Moons, but takes ~twice time
@@ -1375,10 +1375,9 @@ if isempty(ii)
     end
     #mH=repmat(mean(H,2),size(td));[v e]=eig((H-mH)*(H-mH)');
     #[~,mi]=min(diag(e));H=v(:,mi);#Rotate to Local Laplace plane
-    H=vec(mean(H,2))
-    for ii in 1:3
-      H[ii] = H[ii]/sqrt(dot(H,H))
-    end
+    H=mean(H,2)
+    H = H/sqrt(dot(H,H))
+
     h12=sqrt(H[1]^2+H[2]^2)
     N=[-H[2]/h12; H[1]/h12; 0]
     Q=[-H[3]*N[2]; H[3]*N[1]; h12]
@@ -1391,16 +1390,21 @@ if isempty(ii)
       r[ii] = sqrt(dot(R[:,ii],R[:,ii]))
     end
     qr = atan2(R[2,:],R[1,:])
-    jj = []
-    for ii in 1:length(qr)-1
-      if (abs(qr[ii]-qr[ii+1])>1.9*pi)
-        (!isempty(jj)) && (jj = [jj; ii])
-        (isempty(jj)) && (jj = ii)
+
+    dqr = diff(qr)
+    T1 = falses(length(dqr))
+    for ii in 1:length(dqr)
+      T1[ii] = abs(dqr[ii])>pi
+    end
+    jj = find(T1)
+    for ii in 1:length(jj)
+      if (ii == length(jj)) && (jj != length(qr))
+        qr[jj[ii]+1:end] = qr[jj[ii]+1:end] + ii*2*pi
+      else
+        qr[jj[ii]+1:jj[ii+1]] = qr[jj[ii]+1:jj[ii+1]] + ii*2*pi
       end
     end
-    for ii in jj
-      qr[ii:end] = qr[ii:end] + 2*pi
-    end
+
     V=transpose(dcm)*V
     zv=V[3,:]
     V=V[1:2,:]
@@ -1410,7 +1414,7 @@ if isempty(ii)
       v[ii] = dot(V[:,ii],R[:,ii])/r[ii]
       qv[ii] = (R[1,ii]*V[2,ii]-R[2,ii]*V[1,ii])/r[ii]^2
     end
-    di[2:end,:]=[r;qr;zr;v;qv;zv]
+    di[2:end,:]=[r';qr';zr';v';qv';zv']
   else
     dcm=[]
   end
@@ -1492,8 +1496,7 @@ if cb!=10#gives better accuracy for Moons, but takes ~twice time
   r=X[1,:]
   if bvi!=2
     for ii in 1:size(X,2)
-      X[1,ii] = dcm*r[ii]*c[ii]
-      X[2,ii] = dcm*r[ii]*s[ii]
+      X[1:3,ii] = dcm*[r[ii]*c[ii]; r[ii]*s[ii]; X[3,ii]]
     end
   end
   if bvi>1
@@ -1504,8 +1507,8 @@ if cb!=10#gives better accuracy for Moons, but takes ~twice time
       dr[ii] = X[4,ii]
       dq[ii] = X[5,ii]
       rdq[ii] = r[ii]*dq[ii]
-      X[4,ii] = dcm*(dr[ii]*c[ii]-rdq[ii]*s[ii])
-      X[5,ii] = dcm*(dr[ii]*s[ii]+rdq[ii]*c[ii])
+      X[4:6,ii] = dcm*[dr[ii]*c[ii]-rdq[ii]*s[ii]; dr[ii]*s[ii]+rdq[ii]*c[ii];
+                  X[6,ii]]
     end
   end
   if bvi==4
@@ -1514,12 +1517,10 @@ if cb!=10#gives better accuracy for Moons, but takes ~twice time
       d2q=X[8,ii]
       r_=d2r-rdq[ii]*dq[ii]
       q_=r[ii]*d2q+2.*dr[ii]*dq[ii]
-      X[7,ii] = dcm*(r_*c[ii]-q_*s[ii])
-      X[8,ii] = dcm*(r_*s[ii]+q_*c[ii])
-      r_=X[10,ii]-3.*dr[ii]dq[ii]^2-3.*rdq[ii]*d2q
+      X[7:9,ii] = dcm*[r_*c[ii]-q_*s[ii]; r_*s[ii]+q_*c[ii]; X[9,ii]]
+      r_=X[10,ii]-3.*dr[ii]*dq[ii]^2-3.*rdq[ii]*d2q
       q_=r[ii]*X[11,ii]+3.*d2r*dq[ii]+3.*dr[ii]*d2q-rdq[ii]*dq[ii]^2
-      X[10,ii] = dcm*(r_*c[ii]-q_*s[ii])
-      X[11,ii] = dcm*(r_*s[ii]+q_*c[ii])
+      X[10:12,ii] = dcm*[r_*c[ii]-q_*s[ii];r_*s[ii]+q_*c[ii]; X[12,ii]]
     end
   end
 end
@@ -1562,18 +1563,18 @@ end
 #      (12*V_-10*R_-c2(i-1)+3*c2(i))/dt=(8*V_-10*R_-3*c2(i)+c2(i+1))/dt
 #(-15*R_+16*V_-2*c2(i-1)+3*c2(i))/dt^2=(15*R_-14*V_+3*c2(i)-2*c2(i+1))/dt^2
 b = Array(Float64,(3,n-1))
-s = Array(Float64,(3,n-1))
+s = Array(Float64,(3*(n-1)))
 for ii in 2:n
   for jj in 1:3
     b[jj,ii-1]=(12.*V_[jj,ii-1]-10.*R_[jj,ii-1])/dt[ii-1]-
                 (8.*V_[jj,ii]-10.*R_[jj,ii])/dt[ii]
   end
-  s[1,ii-1]= 1./dt[ii-1]
-  s[2,ii-1] = -3./dt[ii-1]-3./dt[ii]
-  s[3,ii-1] = 1./dt[ii]
+  s[ii-1]= 1./dt[ii-1]
+  s[ii+n-2] = -3./dt[ii-1]-3./dt[ii]
+  s[ii+2*n-3] = 1./dt[ii]
 end
-s = [s[1,:] s[2,:] s[3,:]] #s*[c2(i-1);c2(i);c2(i+1)]=b, tridiagonal
-ii = collect(2:n)
+#s*[c2(i-1);c2(i);c2(i+1)]=b, tridiagonal
+ii = 2:n
 jj=[ii-1; ii; ii+1] #sparsity pattern x,y,z
 ii=[ii; ii; ii]
 b_ = zeros(3) #continuous 4th der at 2
@@ -1581,9 +1582,9 @@ for kk in 1:3
   b_[kk]=(-15.*R_[kk,1]+16.*V_[kk,1])/dt[1]^2-
           (15.*R_[kk,2]-14.*V_[kk,2])/dt[2]^2
 end
-s_=[2./dt[1]^2 -3./dt[1]^2+3./dt[2]^2 -2./dt[2]^2]
+s_=[2./dt[1]^2; -3./dt[1]^2+3./dt[2]^2; -2./dt[2]^2]
 b=[b_ b]
-s=vcat(s_, s)
+s=[s_; s]
 
 ii=[1; 1; 1; ii]
 jj=[1; 2; 3; jj]
@@ -1592,13 +1593,13 @@ for kk in 1:3
   b_[kk]=(-15.*R_[kk,n-1]+16*V_[kk,n-1])/dt[n-1]^2-
           (15.*R_[kk,n]-14.*V_[kk,n])/dt[n]^2
 end
-s_=[2./dt[n-1]^2 -3./dt[n-1]^2+3./dt[n]^2 -2./dt[n]^2]
+s_=[2./dt[n-1]^2; -3./dt[n-1]^2+3./dt[n]^2; -2./dt[n]^2]
 b=[b b_]
-s=vcat(s, s_)
+s=[s; s_]
 ii=[ii; n+1; n+1; n+1]
-jj=[jj; n+-1; n; n+1]
+jj=[jj; n-1; n; n+1]
 
-s=sparse(vec(jj),vec(ii),vec(s)) #solve for c2
+s=sparse(jj,ii,s) #solve for c2
 c2=b/s
 c22=c2[:,2:n+1]
 c2=c2[:,1:n]
