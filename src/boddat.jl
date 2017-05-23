@@ -222,7 +222,7 @@ for jj in ii
 end
 
 if (isempty(find(x->(typeof(x)==String),bi)))
-  be=identity(bi)
+  be=copy(bi)
 else
   be=getnum(bi,dict)
 end
@@ -337,7 +337,7 @@ for bvr in 1:nvars
     if isempty(jj)
       a = cb
     else
-      a = identity(bi)
+      a = copy(bi)
       for ib in 1:length(bi)
         if T1[ib]
           a[ib] = cb[ib]
@@ -1160,9 +1160,11 @@ function ephem(b::AbstractArray{Int64},t::AbstractArray{Float64},
 #ephemeris
 # typ is if t is a linspace (true) or if t is vector (false)
 sb=size(b)
-if (sb[1]>2) && (sb[2]>2)
-  warn("Body input for ephemeris should be 1 x n or 2 x n")
-  b=b[1,:]
+if (sb[1]>2) && typeof(b)!=Vector{Int64}
+  if (sb[2]>2)
+    warn("Body input for ephemeris should be 1 x n or 2 x n")
+    b=b[1,:]
+  end
 elseif sb[1]>2
   b=b'
 end
@@ -1186,27 +1188,14 @@ end#b(2,:) is wrt body list
 
 it = collect(1:1:size(b,2))
 ct = collect(2:1:size(b,2))
-for ii in 1:size(b,2)-1
-  sp = 1
-  T1 = identity(ct)
-  for jj in ct
-    if (isnan(b[2,ii]))
-      if (b[1,ii] == b[1,jj]) && (isnan(b[2,jj]))
-        splice!(T1,sp)
+for ii in 1:size(b,2)
+  if !isnan(b[2,ii])
+    for jj in ii:size(b,2)
+      if (b[:,ii]==b[:,jj]) && (it[jj]!=it[ii])
         it[jj] = ii
-        sp = sp - 1
-      end
-    else
-      if b[:,ii] == b[:,jj]
-        splice!(T1,sp)
-        it[jj] = ii
-        sp = sp - 1
       end
     end
-    sp = sp + 1
   end
-  ct = identity(T1)
-  (isempty(ct)) && (continue)
 end
 
 n = 6
@@ -2576,7 +2565,6 @@ if isempty(tephf.numbers)
   s = download("https://ssd.jpl.nasa.gov/eph_spans.cgi?id=A") #Planets
   f = open(s); rd = readstring(f); close(f)
   #Read in bodynumber, begin time, " not " or " to " flag, end time, and file
-  ssT = Array(AbstractString,(1,5))
   off = 1; T1 = true; sss = []
   while T1
     ss=match(r"<td.*?>(\d+)</td>.*?<\w\w?>(.*?) (not|to) (.*?)</\w\w?>&nbsp;.*?&nbsp;(.*?)&nbsp;",rd[off:end])
@@ -2588,7 +2576,8 @@ if isempty(tephf.numbers)
         ssT[ii] = ss.captures[ii]
       end
       if isempty(sss)
-        sss = identity(ssT)
+        append!(sss,ssT)
+        sss=reshape(sss, 1, length(sss))
       else
         sss = [sss; ssT]
       end
@@ -2686,7 +2675,8 @@ if isempty(tephf.numbers)
         (ssT[ii][6:8]=="Dec") && (ssT[ii]=ssT[ii][1:5]*"12"*ssT[ii][9:end])
       end
       if isempty(ss1)
-        ss1 = identity(ssT)
+        append!(ss1,ssT)
+        ss1=reshape(ss1, 1, length(ss1))
       else
         ss1 = [ss1; ssT]
       end
