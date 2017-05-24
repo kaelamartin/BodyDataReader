@@ -226,7 +226,7 @@ if (isempty(find(x->(typeof(x)==String),bi)))
 else
   be=getnum(bi,dict)
 end
-b = zeros(Int64,length(be))
+b = zeros(Int64,size(be))
 for ii in 1:length(be)
   b[ii]=convert(Int64,be[ii])
 end #if size(be,1)>2;be=be';end;b=be(1,:);
