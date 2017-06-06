@@ -2565,8 +2565,8 @@ if isempty(tephf.numbers)
   s = download("https://ssd.jpl.nasa.gov/eph_spans.cgi?id=A") #Planets
   f = open(s); rd = readstring(f); close(f)
   #Read in bodynumber, begin time, " not " or " to " flag, end time, and file
-  off = 1; T1 = true; sss = []
   ssT = Array(AbstractString,(1,4))
+  off = 1; T1 = true; sss = []
   while T1
     ss=match(r"<td.*?>(\d+)</td>.*?<\w\w?>(.*?) (not|to) (.*?)</\w\w?>&nbsp;.*?&nbsp;(.*?)&nbsp;",rd[off:end])
     if ss == nothing
