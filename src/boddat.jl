@@ -2,7 +2,6 @@ function boddat(bvars,bi::Array=[],dict::Dict=Dict(),t=[],opti=[])
 # If have ssd flag, orient will not work and problems may occur elsewhere
 # qorient and orient not fully tested and might throw errors
 
-
 ## Function needs following Julia packages: HDF5, JLD, URIParser
 # Note: Install HDF5 before JLD
 # Add packages by: Pkg.add("HDF5"); Pkg.add("JLD"); Pkg.add("URIParser")
@@ -200,14 +199,13 @@ if isempty(param(dict,"bva"))
         "j2","rotation_period","reference","date","mag","occ","types",
         "close_approach"]
   bva = [bva;ov]
-  ov2 = identity(ov)
   for jj in 1:3
     for ii in 1:length(ov)
-      (jj == 1) && (ov2[ii] = ov[ii]*"dcm")
-      (jj == 2) && (ov2[ii] = "q"*ov[ii])
-      (jj == 3) && (ov2[ii] = "q"*ov[ii]*"dcm")
+      (jj == 1) && (ov[ii] = ov[ii]*"dcm")
+      (jj == 2) && (ov[ii] = "q"*strip(ov[ii],['d','c','m']))
+      (jj == 3) && (ov[ii] = ov[ii]*"dcm")
     end
-    bva = [bva;ov2]
+    bva = [bva;ov]
   end
   param(dict,"bva",bva)
 end
@@ -268,6 +266,13 @@ for bvr in 1:nvars
         bvar = ucfirst(bvar)
         inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
         (!isempty(inBVA)) && (inBVA = inBVA[1])
+        if isempty(inBVA)
+          bvar = lcfirst(bvar)
+          bvar = replace(bvar,"pm","PM")
+          bvar = replace(bvar,"pole","Pole")
+          bvar = replace(bvar,"eq","Eq")
+          inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+        end
       end
     end
   end
@@ -440,7 +445,7 @@ mb = param(dict,"mb")
 
 #change into string, bi is used in central body output
 (typeof(bi)==String) && (b = Array(String,1))
-(typeof(bi)!=String) && (b = Array(Any,length(bi)))
+(typeof(bi)!=String) && (b = Array(Any,size(bi)))
 for ib in 1:length(bi)
   if typeof(bi[ib])!=String
     b[ib] = identity(convert(Int64,bi[ib]))
@@ -2320,19 +2325,39 @@ for ti in 1:n12-1#only do mnt at a time
   clw = length(rd[1])
   (i1!=mx) && (rd = 0)
   if (i1!=mx)
-    X1 = readdlm(s,skipstart=i1,use_mmap=true,skipblanks=true,
-                    dims=(mx,clw))
-    X1 = X1[1:i2-i1-1,1:3]
-    XT = zeros(7)
-    for ii in 1:floor(Int64,size(X1,1)/3)
-      XT[1] = X1[3*ii-2,1]
-      XT[2] = X1[3*ii-1,1]
-      XT[3] = X1[3*ii-1,2]
-      XT[4] = X1[3*ii-1,3]
-      XT[5] = X1[3*ii,1]
-      XT[6] = X1[3*ii,2]
-      XT[7] = X1[3*ii,3]
-      X = [X XT]
+    try
+      X1 = readdlm(s,skipstart=i1,use_mmap=true,skipblanks=true,
+                      dims=(mx,clw))
+      X1 = X1[1:i2-i1-1,1:3]
+      XT = zeros(7)
+      for ii in 1:floor(Int64,size(X1,1)/3)
+        XT[1] = X1[3*ii-2,1]
+        XT[2] = X1[3*ii-1,1]
+        XT[3] = X1[3*ii-1,2]
+        XT[4] = X1[3*ii-1,3]
+        XT[5] = X1[3*ii,1]
+        XT[6] = X1[3*ii,2]
+        XT[7] = X1[3*ii,3]
+        X = [X XT]
+      end
+    catch
+      X=zeros(7,0)
+      X1 = readlines(s)
+      X1 = X1[i1+1:i2-1]
+      nl = div(i2-i1-1,3)
+      XT = zeros(7)
+      for ii in 1:nl
+        XT[1] = parse(matchall(r"[^ =]+",X1[3*ii-2])[1])
+        T1 = matchall(r"[^ =]+",X1[3*ii-1])
+        XT[2] = parse(T1[2])
+        XT[3] = parse(T1[4])
+        XT[4] = parse(T1[6])
+        T1 = matchall(r"[^ =]+",X1[3*ii])
+        XT[5] = parse(T1[2])
+        XT[6] = parse(T1[4])
+        XT[7] = parse(T1[6])
+        X = [X XT]
+      end
     end
   #successful run
   #tri=regexp(ss,'Center radii\s*: ([\d.]+) x ([\d.]+) x ([\d.]+) ','tokens');
@@ -2565,8 +2590,8 @@ if isempty(tephf.numbers)
   s = download("https://ssd.jpl.nasa.gov/eph_spans.cgi?id=A") #Planets
   f = open(s); rd = readstring(f); close(f)
   #Read in bodynumber, begin time, " not " or " to " flag, end time, and file
-  ssT = Array(AbstractString,(1,4))
-  off = 1; T1 = true; sss = []
+  ssT = Array(AbstractString,(1,5))
+  off = 1; T1 = true; sss = Array(AbstractString,(0))
   while T1
     ss=match(r"<td.*?>(\d+)</td>.*?<\w\w?>(.*?) (not|to) (.*?)</\w\w?>&nbsp;.*?&nbsp;(.*?)&nbsp;",rd[off:end])
     if ss == nothing
@@ -2652,7 +2677,7 @@ if isempty(tephf.numbers)
   s = download("https://ssd.jpl.nasa.gov/eph_spans.cgi?id=D") #Satellites
   f = open(s); rd = readstring(f); close(f)
   ssT = Array(AbstractString,(1,2))
-  off = 1; T1 = true; ss1=[]
+  off = 1; T1 = true; ss1=Array(AbstractString,(0))
   while T1
     ss=match(r"&nbsp;(\S+) to (\S+)&nbsp;",rd[off:end])
     if ss == nothing
@@ -2761,7 +2786,8 @@ if (!isempty(ii))&&(!param(dict,"ssd"))&&
   #see if entry exists in field for body
   if isempty(getfield(x,(Symbol(s))))
     o = []
-  elseif (typeof(getfield(x,Symbol(s))[1])==Float64)||(typeof(getfield(x,Symbol(s))[1])==Int64)
+  elseif (typeof(getfield(x,Symbol(s))[1])==Float64)||
+          (typeof(getfield(x,Symbol(s))[1])==Int64)
     if length(getfield(x,Symbol(s)))>=ii
       (!isnan(getfield(x,Symbol(s))[ii])) && (o=getfield(x,Symbol(s))[ii])
       (isnan(getfield(x,Symbol(s))[ii])) && (o=[])
@@ -3040,29 +3066,60 @@ for ii in 1:flds
     if isempty(getfield(x, Nm))
       setfield!(x, Nm, Array(AbstractString,length(x.numbers)))
     end
+    ct = 1
+    nn=size(getfield(x,Nm),1)+1
     for jj in bb
-     getfield(x, Nm)[jj]= v[ii]
+      if bb[ct]- nn == 0
+        push!(getfield(x,Nm),v[ii])
+      elseif bb[ct]>nn
+        for kk in 1:bb[ct]-nn
+          push!(getfield(x,Nm)[nn-1+kk],"_")
+        end
+        push!(getfield(x,Nm),v[ii])
+      else
+        getfield(x,Nm)[jj]=v[ii]
+      end
+      ct = ct + 1
     end
   else
     #write, fill with nans
     if isempty(getfield(x, Nm))
       if Nm == :numbers
-        setfield!(x, Nm,zeros(Int64,length(v[ii])))
+        setfield!(x,Nm,zeros(Int64,length(v[ii])))
+      elseif Nm == :pp && flds == 1
+        setfield!(x,Nm,NaN*zeros(length(x.numbers),length(v)))
       else
-        (isempty(x.numbers)) && (setfield!(x, Nm, NaN*zeros(length(v[ii]))))
-        (!isempty(x.numbers))&&(setfield!(x, Nm, NaN*zeros(length(v[ii]),length(x.numbers))))
+        (isempty(x.numbers)) && (setfield!(x,Nm,NaN*zeros(length(v[ii]))))
+        (!isempty(x.numbers))&&(setfield!(x,Nm,NaN*zeros(length(x.numbers))))
       end
     end
-    nn=size(getfield(x,Nm),2)+1
+    nn=size(getfield(x,Nm),1)+1
     ct = 1
     for jj in bb
-      if typeof(getfield(x,Nm)[:,jj][1])==typeof(v[ii])
-        getfield(x,Nm)[:,jj]=v[ii]
+      if bb[ct]- nn == 0
+        if typeof(getfield(x,Nm)[jj-1][1])==typeof(v[ii])
+          push!(getfield(x,Nm),v[ii])
+        else
+          push!(getfield(x,Nm),convert(typeof(getfield(x,Nm)[jj-1][1]),v[ii]))
+        end
+      elseif bb[ct]>nn
+        for kk in 1:bb[ct]-nn
+          push!(getfield(x,Nm)[nn-1+kk],NaN)
+        end
+        if typeof(getfield(x,Nm)[jj-1][1])==typeof(v[ii])
+          push!(getfield(x,Nm),v[ii])
+        else
+          push!(getfield(x,Nm),convert(typeof(getfield(x,Nm)[jj-1][1]),v[ii]))
+        end
       else
-        getfield(x,Nm)[:,jj]=convert(typeof(getfield(x, Nm)[:,jj][1]),v[ii])
-      end
-      if bb[ct]>nn
-        getfield(x,Nm)[:,nn:bb[ct]-1]=NaN
+        if typeof(getfield(x,Nm)[jj][1])==typeof(v[ii])
+          if Nm == :pp && flds == 1
+            getfield(x,Nm)[jj,:]=v
+          end
+          getfield(x,Nm)[jj]=v[ii]
+        else
+          getfield(x,Nm)[jj]=convert(typeof(getfield(x,Nm)[jj][1]),v[ii])
+        end
       end
       ct = ct + 1
     end
