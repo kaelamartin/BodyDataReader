@@ -1263,6 +1263,7 @@ for ibu in 1:size(b,2)
       end#lowest central body (planet or sun)
       if !typ
         Xb = Array(Float64,length(tt),1)
+        Xb0 = Array(Float64,length(tt),1)
       else
         Xb = Array(Float64,length(tt[1]:tt[3]:tt[2]),1)
         Xb0 = Array(Float64,length(tt[1]:tt[3]:tt[2]),1)
