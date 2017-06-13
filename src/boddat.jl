@@ -2,7 +2,6 @@ function boddat(bvars,bi::Array=[],dict::Dict=Dict(),t=[],opti=[])
 # If have ssd flag, orient will not work and problems may occur elsewhere
 # qorient and orient not fully tested and might throw errors
 
-
 ## Function needs following Julia packages: HDF5, JLD, URIParser
 # Note: Install HDF5 before JLD
 # Add packages by: Pkg.add("HDF5"); Pkg.add("JLD"); Pkg.add("URIParser")
@@ -93,8 +92,6 @@ function boddat(bvars,bi::Array=[],dict::Dict=Dict(),t=[],opti=[])
 #t = Dates.datetime2julian(DateTime(2029,04,13,22)) -
 #      Dates.datetime2julian(DateTime(2000,01,01,12)) + collect(-7:.1:7)
 # Pos,PM,St,n = boddat(["R","qpm","type","num"],["Apophis" "Earth"],Dict(),[t; false])
-# currently errors out because of putsbmb needing to push variables to a list instead
-# of adding to an already allocated array
 
 #   (It can take up to a minute for Horizons to compute the ephemerides.)
 #   Pos = the position of the asteroid Apophis and Earth with respect to the sun
@@ -107,7 +104,7 @@ function boddat(bvars,bi::Array=[],dict::Dict=Dict(),t=[],opti=[])
 #   n = the body numbers of Apophis and Earth
 #
 #Example (con'd): Using saved data
-#RV = boddat("X",["Apophis", "Earth"],Dict(),[t;false]); RV = RV[1]
+#RV = boddat("X",["Apophis"; "Earth"],Dict(),[t;false]); RV = RV[1]
 #
 #   (The run time should be a few orders of magnitude faster.)
 #   RV = the state of Apophis with respect to Earth computed from saved
@@ -117,7 +114,7 @@ function boddat(bvars,bi::Array=[],dict::Dict=Dict(),t=[],opti=[])
 #   RV[1:3,:] = Pos[:,:,1]-Pos[:,:,2]
 #
 #Example (con'd): Bypassing saved data
-#RV_h = boddat("X",[2099942, 399],Dict(),[t[1],t[end],0.1,true],[false true])
+#RV_h = boddat("X",[2099942; 399],Dict(),[t[1],t[end],0.1,true],[false true])
 #
 #   RV_h = the state of Apophis with respect to Earth directly from Horizons.
 #   The zero in the options input indicates to not overwrite any saved data, and
@@ -127,20 +124,20 @@ function boddat(bvars,bi::Array=[],dict::Dict=Dict(),t=[],opti=[])
 #   discrete times.
 
 #SOURCES
-#small body data http://ssd.jpl.nasa.gov/sbdb.cgi
-#Horizons ephemeris and orientation http://ssd.jpl.nasa.gov/horizons_batch.cgi
+#small body data https://ssd.jpl.nasa.gov/sbdb.cgi
+#Horizons ephemeris and orientation https://ssd.jpl.nasa.gov/horizons_batch.cgi
 #list of major bodies
-#       http://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB
-#Ephemeris file names and time spans http://ssd.jpl.nasa.gov/eph_spans.cgi
+#       https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB
+#Ephemeris file names and time spans https://ssd.jpl.nasa.gov/eph_spans.cgi
 #Inner planet, sun & barycenter GM, planet radius J2
 #       ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/
 #Outer planet & satellite GM, planet radius J2
 #       ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/
-#Satellite GM and mean radius http://ssd.jpl.nasa.gov/?sat_phys_par
+#Satellite GM and mean radius https://ssd.jpl.nasa.gov/?sat_phys_par
 #analytic orientation and radii
 #       ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/
-(typeof(bvars) == ASCIIString) && (varargout = Array(Any,1))
-(typeof(bvars) != ASCIIString) && (varargout = Array(Any,length(bvars)))
+(typeof(bvars) == String) && (varargout = Array(Any,1))
+(typeof(bvars) != String) && (varargout = Array(Any,length(bvars)))
 
 if isempty(dict)
   sb = SB([],[],[],[],[],[],[],[],[],[],[])
@@ -153,33 +150,34 @@ end
 
 #peek into params (may be useful for troubleshooting)
 if isempty(bi)
-  if (typeof(bvars) == ASCIIString)
+  if (typeof(bvars) == String)
     varargout = param(dict,bvars)
   else
-  for ii in 1:length(varargout)
-    varargout[ii] = param(dict,bvars[ii])
-  end
+    for ii in 1:length(varargout)
+      varargout[ii] = param(dict,bvars[ii])
+      # varagout[ii] = [] # Return empty if don't want the name of the variables
+    end
   end
   return varargout
 end
 #if there's no time, the time is now
 if isempty(t)
   t = [Dates.datetime2julian(now())-2451545.]
-  typ = false
-else
-  typ = t[end]
-  if (typ==1)||(typ==0)||(typeof(typ)==Bool)
-    typ = typ!=0
-    t = copy(t[1:end-1])
-  else
-    warn("Flag not included at end of time array to create interval")
-    typ = false
-  end
-  if size(t,2)>size(t,1)
-    t = transpose(copy(t[1:end-1]))
-  end
-  (typeof(t[1])==Int64) && (t = t*1.)
 end
+
+if typeof(t) == FloatRange{Float64}
+  typ = true
+  collect(t)
+  t = [t[1]; t[end]; t[2]-t[1]]
+else
+  typ = false
+end
+
+if size(t,2)>size(t,1)
+  t = transpose(t[1:end-1])
+end
+(typeof(t[1])==Int64) && (t = t*1.)
+
 
 #default options is [true false true], replace with any input and save in params
 opts=[true false true]
@@ -196,17 +194,16 @@ end
 if isempty(param(dict,"bva"))
   ov = ["Pole","PM","Eqx"]
   bva = ["R","V","X","A","RTN","number","CB","Name","GM","radius","triaxial",
-        "j2","rotational_period","reference","date","mag","occ","types",
+        "j2","rotation_period","reference","date","mag","occ","types",
         "close_approach"]
   bva = [bva;ov]
-  ov2 = copy(ov)
   for jj in 1:3
     for ii in 1:length(ov)
-      (jj == 1) && (ov2[ii] = ov[ii]*"dcm")
-      (jj == 2) && (ov2[ii] = "q"*ov[ii])
-      (jj == 3) && (ov2[ii] = "q"*ov[ii]*"dcm")
+      (jj == 1) && (ov[ii] = ov[ii]*"dcm")
+      (jj == 2) && (ov[ii] = "q"*strip(ov[ii],['d','c','m']))
+      (jj == 3) && (ov[ii] = ov[ii]*"dcm")
     end
-    bva = [bva;ov2]
+    bva = [bva;ov]
   end
   param(dict,"bva",bva)
 end
@@ -215,26 +212,21 @@ param(dict,"sbmod",false)
 
 #get body numbers as unique identifiers, ephemeris (be) can be 2 x n,
 # otherwise first row of b is used
-ii = find(x->(typeof(x)==SubString{ASCIIString}),bi)
+ii = find(x->(typeof(x)==SubString{String}),bi)
 for jj in ii
    bi[jj] = bi[jj]*""
 end
-if !isempty(bi)
-  if (isempty(find(x->(typeof(x)==ASCIIString),bi)))
-    be=copy(bi)
-  else
-    be=getnum(bi,dict)
-  end
-  b = zeros(Int64,length(be))
-  for ii in 1:length(be)
-    b[ii]=convert(Int64,be[ii])
-  end #if size(be,1)>2;be=be';end;b=be(1,:);
+
+if (isempty(find(x->(typeof(x)==String),bi)))
+  be=copy(bi)
 else
-  for ii in 1:size(varargout,1)
-    varargout=[]
-  end
-  return varargout
+  be=getnum(bi,dict)
 end
+b = zeros(Int64,size(be))
+for ii in 1:length(be)
+  b[ii]=convert(Int64,be[ii])
+end #if size(be,1)>2;be=be';end;b=be(1,:);
+
 #input body parameter variables, if not a cell array then cellstr or split by
 # comma, semicolon, space & or |
 #if ~iscell(bvars);if size(bvars,1)>1;bvars=cellstr(bvars);else;
@@ -243,10 +235,8 @@ end
 #if strcmpi(bvars{1},'all');bvars=cellstr(params('bva'));end
 #for each parameter input call the appropriate funciton and write
 #result to varargout
-if typeof(bvars) == ASCIIString
-  T1 = copy(bvars)
-  bvars = Array(ASCIIString,1)
-  bvars[1] = copy(T1)
+if typeof(bvars) == String
+  bvars = [identity(bvars)]
   nvars = 1
 else
   nvars = length(bvars)
@@ -254,25 +244,53 @@ end
 for bvr in 1:nvars
   bvi = []
   bvar=bvars[bvr]
-  inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+  (typeof(bvar)==Char) && (bvar = string(bvar))
+  if length(bvar)==1
+    inBVA = find(x->(contains(x,bvar)),param(dict,"bva")[1:4])
+  else
+    inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+  end
   (!isempty(inBVA)) && (inBVA = inBVA[1])
   #find out which member of bva matches input
+  if isempty(inBVA)
+    bvar = uppercase(bvar)
+    inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+    (!isempty(inBVA)) && (inBVA = inBVA[1])
+    if isempty(inBVA)
+      bvar = lowercase(bvar)
+      inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+      (!isempty(inBVA)) && (inBVA = inBVA[1])
+      if isempty(inBVA)
+        bvar = ucfirst(bvar)
+        inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+        (!isempty(inBVA)) && (inBVA = inBVA[1])
+        if isempty(inBVA)
+          bvar = lcfirst(bvar)
+          bvar = replace(bvar,"pm","PM")
+          bvar = replace(bvar,"pole","Pole")
+          bvar = replace(bvar,"eq","Eq")
+          inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+          (!isempty(inBVA)) && (inBVA = inBVA[1])
+        end
+      end
+    end
+  end
   (isempty(inBVA)) && (inBVA = 0)
-  if (isempty(bvi)) && (inBVA > 4)
+  if inBVA > 4
     T1=uniqstr(param(dict,"bva"),bvar)
     bvi = T1[1]
-  elseif (isempty(bvi)) && (inBVA <= 4)
+  elseif inBVA <= 4
     bvi = inBVA
   end
-  if isempty(bvi)
+  if bvi == 0
     warn("no match found for ",bvar)
     varargout[bvr]=NaN*ones(size(t))
     continue
   end
   #match bvi
   if bvi<5#ephemeris, {R V X A}
-    if (!param(dict,"ssd"))||(!isdefined(:Xeph)&&(!isdefined(:vars)))
-      Xeph=ephem(be,t,typ,bvi,dict)
+    if (!param(dict,"ssd"))||(!isdefined(:Xeph))
+      Xeph=ephem(b,t,typ,bvi,dict)
     end
 
     a=Xeph
@@ -282,7 +300,7 @@ for bvr in 1:nvars
       a=a[4:6,:,:]
     end
   elseif bvi==5
-    Xeph=ephem(be,t,typ,3,dict)
+    Xeph=ephem(b,t,typ,3,dict)
     R=Xeph[1:3,:,:]
     V=Xeph[4:6,:,:]
     uH = zeros(R)
@@ -306,7 +324,7 @@ for bvr in 1:nvars
   elseif bvi==6
     a=getnumout(b,dict) #number
   elseif bvi==7#central body, matches bi for name vs number output
-    cb=10.*ones(length(b))
+    cb=10*ones(Int64,length(b))
     for jj in 1:length(b)
       if (b[jj]>10)&&(b[jj]<1000)&&(mod(convert(Int64,real(b[jj])),100)!=99)
         cb[jj] = floor(b[jj]/100)*100 + 99
@@ -377,7 +395,7 @@ for bvr in 1:nvars
 end
 #save data to bodydata
 if param(dict,"save")
-  @windows? (fn= string(param(dict,"bdir"),"\\bodydata.jld")):(fn=
+  @static is_windows()? (fn= string(param(dict,"bdir"),"\\bodydata.jld")):(fn=
               string(param(dict,"bdir"),"/bodydata.jld"))
   if !isfile(fn)
     fid = jldopen(fn,"w") # Must use HDF5 and JLD package
@@ -425,14 +443,14 @@ mb = param(dict,"mb")
 # sav = false
 
 #change into string, bi is used in central body output
-(typeof(bi)==ASCIIString) && (b = Array(ASCIIString,1))
-(typeof(bi)!=ASCIIString) && (b = Array(Any,length(bi)))
+(typeof(bi)==String) && (b = Array(String,1))
+(typeof(bi)!=String) && (b = Array(Any,size(bi)))
 for ib in 1:length(bi)
-  if typeof(bi[ib])!=ASCIIString
-    b[ib] = copy(convert(Int64,bi[ib]))
+  if typeof(bi[ib])!=String
+    b[ib] = identity(convert(Int64,bi[ib]))
     continue
   else
-    bib = copy(bi[ib])
+    bib = identity(bi[ib])
   end
   if contains(bi[ib],"_CP")
     nbcp = true
@@ -440,7 +458,7 @@ for ib in 1:length(bi)
   else
     nbcp = false
   end
-  if typeof(bib)!=ASCIIString
+  if typeof(bib)!=String
     b[ib] = bib #already a number
   else #match a string
     x,_=getsbmb("mb",dict)
@@ -497,7 +515,7 @@ function getnumout{T}(bi::AbstractArray{T},dict::Dict)
 
 bo = zeros(length(bi))
 for ib in 1:length(bi)
-  b1=copy(bi[ib])
+  b1=identity(bi[ib])
   if imag(b1) != 0
     nbcp=true
     b1=real(b1)
@@ -590,7 +608,7 @@ function getgm(bs::AbstractArray{Int64},dict::Dict)
 #   density and size
 gmx=zeros(length(bs))
 for jj in 1:length(bs)
-  b=copy(bs[jj])
+  b=identity(bs[jj])
   (imag(b)!=0) && (gm=NaN)
   (imag(b)==0) && (gm=getx(b,"gm",dict)) #check saved data (& no ssd flag)
   if (!isempty(gm)) && (gm !=NaN)#found it
@@ -650,7 +668,7 @@ for jj in 1:length(bs)
           [10; collect(3:9)*100+99; 301])
     j2=NaN
   end
-  j2x[jj]=j2
+  j2x[jj]=j2[1]
 end
 return j2x
 end
@@ -721,7 +739,7 @@ for jj=1:length(bs)
       #extent is flag for triaxial radii,convert to #,
       #   make axisymmetric if only 2#s
       nn,ee,ss=getsb(b,dict)
-      f = open(ss); rd = readall(f); close(f)
+      f = open(ss); rd = readstring(f); close(f)
       r1 = search(rd,r">extent<.*?>")
       if r1 != 0:-1
         off = r1[end]
@@ -825,7 +843,7 @@ return hx
 end
 
 function gettyp(bs::AbstractArray{Int64},dict::Dict)
-hx=Array(ASCIIString,size(bs))
+hx=Array(String,size(bs))
 for jj in 1:length(bs)
   b=bs[jj]
   if (b<1e6)||(imag(b)!=0) #only for small bodies
@@ -860,7 +878,7 @@ for jj=1:length(bs)
     cada[jj]=[]
     continue
   end
-  s=download("http://ssd.jpl.nasa.gov/sbdb.cgi?sstr="*string(b)*";cad=1")
+  s=download("https://ssd.jpl.nasa.gov/sbdb.cgi?sstr="*string(b)*";cad=1")
   f = open(s); rd = readlines(f); close(f)
   if jj/100==round(Int64,jj/100)
     println("Close approach progress: ",floor(jj/length(bs)*100,0),"%")
@@ -917,7 +935,7 @@ for jj=1:length(bs)
       T2 = getnum([T1],dict)
       cad[ii,2] = T2[1]
     end
-    LastNum = copy(T1)
+    LastNum = identity(T1)
 
     lns = match(r"size=\"-2\">",rd[lne[ii]+4])
     ln = match(r"</font>",rd[lne[ii]+4])
@@ -933,7 +951,7 @@ return cada
 end
 
 function getref(bs::AbstractArray{Int64},dict::Dict)
-hx=Array(ASCIIString,size(bs))
+hx=Array(String,size(bs))
 for jj=1:length(bs)
   b=bs[jj]
   if imag(b)!=0
@@ -1013,7 +1031,7 @@ it = collect(1:length(bb))
 ct = collect(2:length(bb))
 for ii in 1:length(bb)-1
   sp = 1
-  T1 = copy(ct)
+  T1 = identity(ct)
   for jj in ct
     if bb[ii] == bb[jj]
       splice!(T1,sp)
@@ -1022,7 +1040,7 @@ for ii in 1:length(bb)-1
     end
     sp = sp + 1
   end
-  ct = copy(T1)
+  ct = identity(T1)
   (isempty(ct)) && (continue)
 end
 
@@ -1043,7 +1061,7 @@ end
 
 for ibu in 1:length(bb)
   if it[ibu] != ibu #match times for each unique body
-    if tb  && (tt[ibu]==tt[it[ibu]])## CHange the input and copy for other values
+    if tb  && (tt[ibu]==tt[it[ibu]])# Change the input and copy for other values
       xx[:,ibu] = xx[:,itp[ibu]]
       continue
     elseif !tb
@@ -1096,10 +1114,11 @@ for ibu in 1:length(bb)
   X=pp[1:3] #X = pole, cl2 is Pole|PM|eqx output
   if ll>1
     #need X = pole node
-    P=copy(X)
+    P=identity(X)
     p12=sqrt(P[1]^2+P[2]^2)
     X=[P[2]/p12;-P[1]/p12; 0*p12]
-    #if ll>1;P=X;X=cross(qorient(399,0,1),P);X=X/sqrt(sum(X.*X));#need X = pole node
+    #if ll>1;P=X;X=cross(qorient(399,0,1),P);
+    #X=X/sqrt(sum(X.*X));#need X = pole node
     if cl2>1
       if cl2==2 #need angle
         T1 = getrot([b],dict)
@@ -1141,14 +1160,16 @@ end#for ibu
 return xx
 end
 
-function ephem{P}(b::AbstractArray{P},t::AbstractArray{Float64},
+function ephem(b::AbstractArray{Int64},t::Array{Float64,1},
                     typ::Bool,bvi::Int64,dict::Dict)
 #ephemeris
 # typ is if t is a linspace (true) or if t is vector (false)
 sb=size(b)
-if (sb[1]>2) && (sb[2]>2)
-  warn("Body input for ephemeris should be 1 x n or 2 x n")
-  b=b[1,:]
+if (sb[1]>2) && typeof(b)!=Vector{Int64}
+  if (sb[2]>2)
+    warn("Body input for ephemeris should be 1 x n or 2 x n")
+    b=b[1,:]
+  end
 elseif sb[1]>2
   b=b'
 end
@@ -1171,36 +1192,24 @@ if size(b,1)==1
 end#b(2,:) is wrt body list
 
 it = collect(1:1:size(b,2))
-ct = collect(2:1:size(b,2))
-for ii in 1:size(b,2)-1
-  sp = 1
-  T1 = copy(ct)
-  for jj in ct
-    if (isnan(b[2,ii]))
-      if (b[1,ii] == b[1,jj]) && (isnan(b[2,jj]))
-        splice!(T1,sp)
+for ii in 1:size(b,2)
+  if !isnan(b[2,ii])
+    for jj in ii:size(b,2)
+      if (b[:,ii]==b[:,jj]) && (it[jj]!=it[ii])
         it[jj] = ii
-        sp = sp - 1
-      end
-    else
-      if b[:,ii] == b[:,jj]
-        splice!(T1,sp)
-        it[jj] = ii
-        sp = sp - 1
       end
     end
-    sp = sp + 1
   end
-  ct = copy(T1)
-  (isempty(ct)) && (continue)
 end
 
 n = 6
 (bvi == 4) && (n = 12)
 if tb
   X = Array(Float64,(n,size(b,2)))
-else
+elseif !typ
   X = Array(Float64,(n,length(t),size(b,2)))
+else
+  X = Array(Float64,(n,length(t[1]:t[3]:t[2]),size(b,2)))
 end
 
 for ibu in 1:size(b,2)
@@ -1224,9 +1233,12 @@ for ibu in 1:size(b,2)
     end
   else#wrt some specified body, may need to tree
     if tb
-      tt=t[ibu]
+      tt=[t[ibu]]
     else
-      tt=copy(t)
+      tt=identity(t)
+      if isempty(sizeof(tt))
+        tt = [tt]
+      end
     end#match 1-to-one, or all times per body
     if bib==b0b#target=wrt, X=0
         if typ
@@ -1249,7 +1261,13 @@ for ibu in 1:size(b,2)
       if ((cb!=10)||(cb0!=10)) && ((cb==cb0)||(cb==b0b)||(bib==cb0))
         lcb=max(cb,cb0)
       end#lowest central body (planet or sun)
-      Xb =0
+      if !typ
+        Xb = Array(Float64,length(tt),1)
+        Xb0 = Array(Float64,length(tt),1)
+      else
+        Xb = Array(Float64,length(tt[1]:tt[3]:tt[2]),1)
+        Xb0 = Array(Float64,length(tt[1]:tt[3]:tt[2]),1)
+      end
       if lcb!=bib
         Xb,_=ephem1(bib,tt,typ,bvi,dict)
         if lcb!=cb
@@ -1257,7 +1275,7 @@ for ibu in 1:size(b,2)
           Xb=Xb+XT
         end
       end#get target state wrt lcb
-      Xb0=0
+
       if lcb!=b0b
         Xb0,_=ephem1(b0b,tt,typ,bvi,dict)
         if lcb!=cb0
@@ -1273,7 +1291,11 @@ for ibu in 1:size(b,2)
     elseif bib != b0b
       X[:,:,ibu]=Xb-Xb0
     elseif size(b,2) == 1
-      X = zeros(6,length(t),1)
+      if !typ
+        X = zeros(6,length(t),1)
+      else
+        X = zeros(6,length(t[1]:t[3]:t[2]),1)
+      end
       X[:,:,ibu]=Xb-Xb0
     else
       warn("Resulting epemeris probably junk. Change ephem function in boddat")
@@ -1284,7 +1306,7 @@ end
 return X
 end
 
-function ephem1(bib::Int64,t::AbstractArray{Float64},typ::Bool,
+function ephem1(bib::Int64,t::Array{Float64,1},typ::Bool,
                   bvi::Int64,dict::Dict)
 n=6
 if bvi==4
@@ -1324,13 +1346,15 @@ else
 end#central body, treat planets and satellites differently
 ii=find(x->(x==bib),id)#see if saved data exists
 if isempty(ii)
-  @windows? (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)".jld"):(efile =
-              param(dict,"bdir")*"/ephem/"*string(bib)*".jld")
+  @static is_windows()?
+      (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)".jld") :
+      (efile = param(dict,"bdir")*"/ephem/"*string(bib)*".jld")
   if (!isfile(efile)) && (bib>1e6)
     bib,_=getsb(bib,dict)
     bib=bib[1]
-    @windows? (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)".jld"):(efile =
-                param(dict,"bdir")*"/ephem/"*string(bib)".jld")
+    @static is_windows()?
+        (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)".jld") :
+        (efile = param(dict,"bdir")*"/ephem/"*string(bib)".jld")
                 #see if number changed
   end
   if !isfile(efile) #te is saved time span, di is data to save, don't save nans
@@ -1344,7 +1368,7 @@ if isempty(ii)
     end#no good data
   else
     f=load(efile)
-    di=f["d"]
+    di=identity(f["d"])
   end#file exists, read data, 1st two entries is data size
 
   if cb!=10#gives better accuracy for Moons, but takes ~twice time
@@ -1358,10 +1382,9 @@ if isempty(ii)
     end
     #mH=repmat(mean(H,2),size(td));[v e]=eig((H-mH)*(H-mH)');
     #[~,mi]=min(diag(e));H=v(:,mi);#Rotate to Local Laplace plane
-    H=vec(mean(H,2))
-    for ii in 1:3
-      H[ii] = H[ii]/sqrt(dot(H,H))
-    end
+    H=mean(H,2)
+    H = H/sqrt(dot(H,H))
+
     h12=sqrt(H[1]^2+H[2]^2)
     N=[-H[2]/h12; H[1]/h12; 0]
     Q=[-H[3]*N[2]; H[3]*N[1]; h12]
@@ -1374,16 +1397,21 @@ if isempty(ii)
       r[ii] = sqrt(dot(R[:,ii],R[:,ii]))
     end
     qr = atan2(R[2,:],R[1,:])
-    jj = []
-    for ii in 1:length(qr)-1
-      if (abs(qr[ii]-qr[ii+1])>1.9*pi)
-        (!isempty(jj)) && (jj = [jj; ii])
-        (isempty(jj)) && (jj = ii)
+
+    dqr = diff(qr)
+    T1 = falses(length(dqr))
+    for ii in 1:length(dqr)
+      T1[ii] = abs(dqr[ii])>pi
+    end
+    jj = find(T1)
+    for ii in 1:length(jj)
+      if (ii == length(jj)) && (jj != length(qr))
+        qr[jj[ii]+1:end] = qr[jj[ii]+1:end] + ii*2*pi
+      else
+        qr[jj[ii]+1:jj[ii+1]] = qr[jj[ii]+1:jj[ii+1]] + ii*2*pi
       end
     end
-    for ii in jj
-      qr[ii:end] = qr[ii:end] + 2*pi
-    end
+
     V=transpose(dcm)*V
     zv=V[3,:]
     V=V[1:2,:]
@@ -1393,7 +1421,7 @@ if isempty(ii)
       v[ii] = dot(V[:,ii],R[:,ii])/r[ii]
       qv[ii] = (R[1,ii]*V[2,ii]-R[2,ii]*V[1,ii])/r[ii]^2
     end
-    di[2:end,:]=[r;qr;zr;v;qv;zv]
+    di[2:end,:]=[r';qr';zr';v';qv';zv']
   else
     dcm=[]
   end
@@ -1455,10 +1483,10 @@ end
 X=zeros(6,length(t))
 if (bvi!=2)||(cb!=10)
   (typeof(t) == Float64) && (t = [t])
-  pval!(d[ii],t,1,sub(X,1:3,:))
+  pval!(d[ii],t,1,view(X,1:3,:))
 end
 if bvi>1
-  pval!(d[ii],t,2,sub(X,4:6,:))
+  pval!(d[ii],t,2,view(X,4:6,:))
 end
 if bvi==4
   T1 = zeros(3,length(t))
@@ -1475,8 +1503,7 @@ if cb!=10#gives better accuracy for Moons, but takes ~twice time
   r=X[1,:]
   if bvi!=2
     for ii in 1:size(X,2)
-      X[1,ii] = dcm*r[ii]*c[ii]
-      X[2,ii] = dcm*r[ii]*s[ii]
+      X[1:3,ii] = dcm*[r[ii]*c[ii]; r[ii]*s[ii]; X[3,ii]]
     end
   end
   if bvi>1
@@ -1487,8 +1514,8 @@ if cb!=10#gives better accuracy for Moons, but takes ~twice time
       dr[ii] = X[4,ii]
       dq[ii] = X[5,ii]
       rdq[ii] = r[ii]*dq[ii]
-      X[4,ii] = dcm*(dr[ii]*c[ii]-rdq[ii]*s[ii])
-      X[5,ii] = dcm*(dr[ii]*s[ii]+rdq[ii]*c[ii])
+      X[4:6,ii] = dcm*[dr[ii]*c[ii]-rdq[ii]*s[ii]; dr[ii]*s[ii]+rdq[ii]*c[ii];
+                  X[6,ii]]
     end
   end
   if bvi==4
@@ -1497,12 +1524,10 @@ if cb!=10#gives better accuracy for Moons, but takes ~twice time
       d2q=X[8,ii]
       r_=d2r-rdq[ii]*dq[ii]
       q_=r[ii]*d2q+2.*dr[ii]*dq[ii]
-      X[7,ii] = dcm*(r_*c[ii]-q_*s[ii])
-      X[8,ii] = dcm*(r_*s[ii]+q_*c[ii])
-      r_=X[10,ii]-3.*dr[ii]dq[ii]^2-3.*rdq[ii]*d2q
+      X[7:9,ii] = dcm*[r_*c[ii]-q_*s[ii]; r_*s[ii]+q_*c[ii]; X[9,ii]]
+      r_=X[10,ii]-3.*dr[ii]*dq[ii]^2-3.*rdq[ii]*d2q
       q_=r[ii]*X[11,ii]+3.*d2r*dq[ii]+3.*dr[ii]*d2q-rdq[ii]*dq[ii]^2
-      X[10,ii] = dcm*(r_*c[ii]-q_*s[ii])
-      X[11,ii] = dcm*(r_*s[ii]+q_*c[ii])
+      X[10:12,ii] = dcm*[r_*c[ii]-q_*s[ii];r_*s[ii]+q_*c[ii]; X[12,ii]]
     end
   end
 end
@@ -1545,18 +1570,18 @@ end
 #      (12*V_-10*R_-c2(i-1)+3*c2(i))/dt=(8*V_-10*R_-3*c2(i)+c2(i+1))/dt
 #(-15*R_+16*V_-2*c2(i-1)+3*c2(i))/dt^2=(15*R_-14*V_+3*c2(i)-2*c2(i+1))/dt^2
 b = Array(Float64,(3,n-1))
-s = Array(Float64,(3,n-1))
+s = Array(Float64,(3*(n-1)))
 for ii in 2:n
   for jj in 1:3
     b[jj,ii-1]=(12.*V_[jj,ii-1]-10.*R_[jj,ii-1])/dt[ii-1]-
                 (8.*V_[jj,ii]-10.*R_[jj,ii])/dt[ii]
   end
-  s[1,ii-1]= 1./dt[ii-1]
-  s[2,ii-1] = -3./dt[ii-1]-3./dt[ii]
-  s[3,ii-1] = 1./dt[ii]
+  s[ii-1]= 1./dt[ii-1]
+  s[ii+n-2] = -3./dt[ii-1]-3./dt[ii]
+  s[ii+2*n-3] = 1./dt[ii]
 end
-s = [s[1,:] s[2,:] s[3,:]] #s*[c2(i-1);c2(i);c2(i+1)]=b, tridiagonal
-ii = collect(2:n)
+#s*[c2(i-1);c2(i);c2(i+1)]=b, tridiagonal
+ii = 2:n
 jj=[ii-1; ii; ii+1] #sparsity pattern x,y,z
 ii=[ii; ii; ii]
 b_ = zeros(3) #continuous 4th der at 2
@@ -1564,8 +1589,9 @@ for kk in 1:3
   b_[kk]=(-15.*R_[kk,1]+16.*V_[kk,1])/dt[1]^2-
           (15.*R_[kk,2]-14.*V_[kk,2])/dt[2]^2
 end
-s_=[2./dt[1]^2 -3./dt[1]^2+3./dt[2]^2 -2./dt[2]^2]
-b=[b_ b]; s=[s_ s]
+s_=[2./dt[1]^2; -3./dt[1]^2+3./dt[2]^2; -2./dt[2]^2]
+b=[b_ b]
+s=[s_; s]
 
 ii=[1; 1; 1; ii]
 jj=[1; 2; 3; jj]
@@ -1574,12 +1600,13 @@ for kk in 1:3
   b_[kk]=(-15.*R_[kk,n-1]+16*V_[kk,n-1])/dt[n-1]^2-
           (15.*R_[kk,n]-14.*V_[kk,n])/dt[n]^2
 end
-s_=[2./dt[n-1]^2 -3./dt[n-1]^2+3./dt[n]^2 -2./dt[n]^2]
-b=[b b_]; s=[s s_]
+s_=[2./dt[n-1]^2; -3./dt[n-1]^2+3./dt[n]^2; -2./dt[n]^2]
+b=[b b_]
+s=[s; s_]
 ii=[ii; n+1; n+1; n+1]
-jj=[jj; n+-1; n; n+1]
+jj=[jj; n-1; n; n+1]
 
-s=sparse(vec(jj),vec(ii),vec(s)) #solve for c2
+s=sparse(jj,ii,s) #solve for c2
 c2=b/s
 c22=c2[:,2:n+1]
 c2=c2[:,1:n]
@@ -1760,7 +1787,7 @@ it = collect(1:length(bb))
 ct = collect(2:length(bb))
 for ii in 1:length(bb)-1
   sp = 1
-  T1 = copy(ct)
+  T1 = identity(ct)
   for jj in ct
     if bb[ii] == bb[jj]
       splice!(T1,sp)
@@ -1769,7 +1796,7 @@ for ii in 1:length(bb)-1
     end
     sp = sp + 1
   end
-  ct = copy(T1)
+  ct = identity(T1)
   (isempty(ct)) && (continue)
 end
 
@@ -1833,7 +1860,7 @@ for ibu in 1:length(bb) #match times for each unique body
     jj = []
     ij = []
   end
-  any(x->(x==cl2),jj) ? (ii = copy(ij)) : (ii = [])
+  any(x->(x==cl2),jj) ? (ii = identity(ij)) : (ii = [])
   ssd=param(dict,"ssd")
   if isempty(ii)||ssd#read from file or horizons
     if ssd #te is saved time span
@@ -1846,8 +1873,9 @@ for ibu in 1:length(bb) #match times for each unique body
 
     #file names
     fls=["pol" "pm" "eqx"]; err=0
-    @windows? (edir= string(param(dict,"bdir"),"\\ephem\\",fls[cl2],bib,".jld")):(edir=
-                string(param(dict,"bdir"),"/ephem/",fls[cl2],bib,".jld"))
+    @static is_windows()?
+        (edir = string(param(dict,"bdir"),"\\ephem\\",fls[cl2],bib,".jld")) :
+        (edir = string(param(dict,"bdir"),"/ephem/",fls[cl2],bib,".jld"))
     rf=!ssd&&isfile(edir)
     if rf
       #read from file if rf, 1st two entries is data size
@@ -1891,7 +1919,7 @@ for ibu in 1:length(bb) #match times for each unique body
       if cl2==1 #X is pole node, Pole x [0;0;1]
         di=[td;X[1:2,:]]
         if ll==2
-          P=copy(X)
+          P=identity(X)
           for jj in 1:size(X,2)
             X[1,jj] = P[2,jj]
             X[2,jj] = -P[1,jj]
@@ -2001,7 +2029,8 @@ for ibu in 1:length(bb) #match times for each unique body
       for jj in kk
         ist[jj] = true
       end
-      warn("Min time for ",bib," ephem spline is ",Dates.julian2datetime(tl+2451545))
+      warn("Min time for ",bib," ephem spline is ",
+          Dates.julian2datetime(tl+2451545))
     end
     tl=d[ii][cl2]["breaks"][end]
     if maximum(t)>tl
@@ -2009,7 +2038,8 @@ for ibu in 1:length(bb) #match times for each unique body
       for jj in kk
         ist[jj] = true
       end
-      warn("Max time for ",bib," ephem spline is ",Dates.julian2datetime(tl+2451545))
+      warn("Max time for ",bib," ephem spline is ",
+            Dates.julian2datetime(tl+2451545))
     end
     if any(ist) #ist is indeces of data outside of spline range
       ts=t[ist]
@@ -2070,7 +2100,7 @@ for ibu in 1:length(bb) #match times for each unique body
     end
   end
   if cl2==div(ll,2) #dcm
-    XT = copy(X); X = zeros(9,size(X,2))
+    XT = identity(X); X = zeros(9,size(X,2))
     for jj in 1:size(X,2)
       XP = cross(P[:,jj],XT[:,jj])
       for kk in 1:3
@@ -2223,13 +2253,14 @@ end
 #tt is expected time output from horizons, can only run 400 times in list,
 # or 90,000 times in {start,end,delta}
 if !typ
-  ist = sortperm(collect(t)) #dev add collect to force collumn vector
+  ist = sortperm(collect(t)) #dev add collect to force column vector
   tt = t[ist]
   mnt=400
 else
   tt=collect(t[1]:t[3]:t[2])
   mnt=90000
-  (length(tt)<2) && (warn("invalid {start time, end time, delta time} input to Horizons"))
+  (length(tt)<2) &&
+    (warn("invalid {start time, end time, delta time} input to Horizons"))
 end
 if (isempty(ieph))
   warn("no horizons ephemeris file for ",n)
@@ -2267,7 +2298,8 @@ println("Retrieving data for Body ",n," from Horizons")
 for ti in 1:n12-1#only do mnt at a time
   #time input for url
   if typ
-    tstr = @sprintf("&START_TIME='JD%%20%.9f'&STOP_TIME='JD%%20%.9f'&STEP_SIZE='%d'",
+    tstr =
+    @sprintf("&START_TIME='JD%%20%.9f'&STOP_TIME='JD%%20%.9f'&STEP_SIZE='%d'",
     tt[t12[ti]+1]+2451545,tt[t12[ti+1]]+2451545,t12[ti+1]-t12[ti]-1)
   else
     tstr = "&TLIST='"
@@ -2286,12 +2318,13 @@ for ti in 1:n12-1#only do mnt at a time
     llstr=""
   end
   # horizons URL
-  url=@sprintf("http://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND='%s%d%s'",
+  url=@sprintf(
+    "https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND='%s%d%s'",
       DES,n,CAP)
   url = url*@sprintf("&CENTER='%s@%d%s'&MAKE_EPHEM='YES'",coord,cb,llstr)
   url = url*@sprintf("&TABLE_TYPE='VECTORS'%s&OUT_UNITS='KM-S'",tstr)
   url = url*"&VECT_TABLE='2'&REF_PLANE='ECLIPTIC'&REF_SYSTEM='J2000'"
-  url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'&OBJ_DATA='NOPE'"
+  #url = url*"&OBJ_DATA='NOPE'" # Originally included but errors out
   #url = url*"&VECT_CORR='NONE'&VEC_LABELS='NO'&CSV_FORMAT='NO'"
   s = download(url) #run horizons url command and extract goodies
   f = open(s); rd = readlines(f); close(f)
@@ -2301,7 +2334,7 @@ for ti in 1:n12-1#only do mnt at a time
     (contains(rd[i1],"\$\$SOE")) && (T1 = false)
     (i1 == mx) && (T1 = false)
   end
-  T1 = true; i2 = copy(i1)
+  T1 = true; i2 = identity(i1)
   (i2==mx) && (T1=false)
   while T1
     i2 = i2 + 1
@@ -2311,19 +2344,39 @@ for ti in 1:n12-1#only do mnt at a time
   clw = length(rd[1])
   (i1!=mx) && (rd = 0)
   if (i1!=mx)
-    X1 = readdlm(s,skipstart=i1,use_mmap=true,skipblanks=true,
-                    ignore_invalid_chars=true,dims=(mx,clw))
-    X1 = X1[1:i2-i1-1,1:3]
-    XT = zeros(7)
-    for ii in 1:floor(Int64,size(X1,1)/3)
-      XT[1] = X1[3*ii-2,1]
-      XT[2] = X1[3*ii-1,1]
-      XT[3] = X1[3*ii-1,2]
-      XT[4] = X1[3*ii-1,3]
-      XT[5] = X1[3*ii,1]
-      XT[6] = X1[3*ii,2]
-      XT[7] = X1[3*ii,3]
-      X = [X XT]
+    try
+      X1 = readdlm(s,skipstart=i1,use_mmap=true,skipblanks=true,
+                      dims=(mx,clw))
+      X1 = X1[1:i2-i1-1,1:3]
+      XT = zeros(7)
+      for ii in 1:floor(Int64,size(X1,1)/3)
+        XT[1] = X1[3*ii-2,1]
+        XT[2] = X1[3*ii-1,1]
+        XT[3] = X1[3*ii-1,2]
+        XT[4] = X1[3*ii-1,3]
+        XT[5] = X1[3*ii,1]
+        XT[6] = X1[3*ii,2]
+        XT[7] = X1[3*ii,3]
+        X = [X XT]
+      end
+    catch
+      X=zeros(7,0)
+      X1 = readlines(s)
+      X1 = X1[i1+1:i2-1]
+      nl = div(i2-i1-1,3)
+      XT = zeros(7)
+      for ii in 1:nl
+        XT[1] = parse(matchall(r"[^ =]+",X1[3*ii-2])[1])
+        T1 = matchall(r"[^ =]+",X1[3*ii-1])
+        XT[2] = parse(T1[2])
+        XT[3] = parse(T1[4])
+        XT[4] = parse(T1[6])
+        T1 = matchall(r"[^ =]+",X1[3*ii])
+        XT[5] = parse(T1[2])
+        XT[6] = parse(T1[4])
+        XT[7] = parse(T1[6])
+        X = [X XT]
+      end
     end
   #successful run
   #tri=regexp(ss,'Center radii\s*: ([\d.]+) x ([\d.]+) x ([\d.]+) ','tokens');
@@ -2335,10 +2388,21 @@ for ti in 1:n12-1#only do mnt at a time
     return X, tt, err
   end
   if ti!=n12-1
-    println("Horizons progress: ",floor(Int64,(t12[ti+1]-nt1)/(n2t-nt1)*100),"%")
+    println("Horizons progress: ",
+      floor(Int64,(t12[ti+1]-nt1)/(n2t-nt1)*100),"%")
   end
 end#ti
-tt=[transpose(tt[1:nt1]) X[1,:]-2451545. transpose(tt[end-nt2+1:end])]
+if nt1 == 0 && nt2 == 0
+  tt=transpose(X[1,:]-2451545.)
+elseif nt1 == 0
+  tt=[X[1,:].'-2451545. transpose(tt[end-nt2+1:end])]
+elseif nt2 ==0
+  tt=[transpose(tt[1:nt1]) X[1,:].'-2451545.]
+else
+  tt=[transpose(tt[1:nt1]) X[1,:].'-2451545. transpose(tt[end-nt2+1:end])]
+end
+
+
 X=[NaN*ones(6,nt1) (1-2*(!isempty(ll)))*X[2:7,:] NaN*ones(6,nt2)]
 #pad out of range data with nans, if orient X=-X
 if !typ
@@ -2346,14 +2410,15 @@ if !typ
   tt[ist]=tt
 end#output times in same order as input
 
-@windows? (edir= string(param(dict,"bdir"),"\\ephem")):(edir=
-            string(param(dict,"bdir"),"/ephem"))
+@static is_windows()? (edir = string(param(dict,"bdir"),"\\ephem")) :
+  (edir = string(param(dict,"bdir"),"/ephem"))
 
 if !isdir(edir)
   mkdir(edir)
 end#make "ephem" directory
 if (param(dict,"save")) && (isempty(ll)) #save ephemeris data
-  @windows? (f= edir*"\\"*string(n)*".jld"):(f= edir*"/"*string(n)*".jld")
+  @static is_windows()? (f= edir*"\\"*string(n)*".jld") :
+      (f= edir*"/"*string(n)*".jld")
   fid = jldopen(f,"w")
   d=[tt;X]
   if !typ
@@ -2387,7 +2452,7 @@ ef1=getef(dict)
 ii = find(x->(x==string(b)),ef1.numbers)
 ef = lowercase(match(r"^[^-._ ]*",ef1.f[ii[1]]).match)
 #only need first file if merged
-ef = convert(ASCIIString,ef)
+ef = convert(String,ef)
 if isempty(ef)
   warn("no ephemeris header file for ",b)
   ed=[]
@@ -2397,10 +2462,10 @@ ed=param(dict,ef) #see if file data already saved
 if (isempty(ed)) && (b<400) #inner planets and barycenters
   #read in DE### header data
   ef=match(r"de\d+",ef).match #deXXX format
-  ef = convert(ASCIIString,ef)
+  ef = convert(String,ef)
   efdir="ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/"*ef*"/" #directory
   s = download(efdir)
-  f = open(s); rd = readall(f); close(f)
+  f = open(s); rd = readstring(f); close(f)
   T1 = true; fils = []; off = 1; ct = 0; #sometimes in "header.XXX_YYY" format
   T2 = Regex(join(["header.",ef[3:end],"_?\\d*"],""))
   fil = matchall(T2,rd[off:end])
@@ -2419,7 +2484,7 @@ if (isempty(ed)) && (b<400) #inner planets and barycenters
   else
     s = download(efdir*fils[1])
   end
-  f = open(s); rd = readall(f); close(f)
+  f = open(s); rd = readstring(f); close(f)
   ii= search(rd,"GROUP   1040")
   jj = search(rd,"GROUP   1041")
   kk = search(rd,"GROUP   1050")
@@ -2427,7 +2492,7 @@ if (isempty(ed)) && (b<400) #inner planets and barycenters
   T1 = split(rd[ii[end]+1:jj[1]-1])  #read in variable names (each 6 chars)
   vars = Array(AbstractString,length(T1)-1)
   for ii in 1:length(T1)-1
-    vars[ii] = copy(T1[ii+1])
+    vars[ii] = identity(T1[ii+1])
   end
 
   T1 = split(rd[jj[end]+1:kk[1]-1])  #read in variable names (each 6 chars)
@@ -2469,7 +2534,7 @@ if (isempty(ed)) && (b<400) #inner planets and barycenters
 elseif isempty(ed) #outer planets and satellites
   #check default directory and eph filename
   s =  download("ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/")
-  f = open(s); rd = readall(f); close(f)
+  f = open(s); rd = readstring(f); close(f)
   if rd[1]!='<'
     fil = matchall(r"\S+(?=.txt)",rd[1:end])
     fils = union(fil)
@@ -2505,7 +2570,7 @@ elseif isempty(ed) #outer planets and satellites
   if err
     s =  download("ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/"
           *fils[ii[1]]*".txt")
-    f = open(s); rd = readall(f); close(f)
+    f = open(s); rd = readstring(f); close(f)
     #s is ephemeris header file
     #get GM from "Bodies on the File" table: skip space,keep 3 #s,
     # skip some space, keep some #s, decimal, & non-space,skip space
@@ -2543,13 +2608,15 @@ function getef(dict::Dict)
 #Ephemeris file and time spans used by Horizons
 tephf=param(dict,"tephf")
 if isempty(tephf.numbers)
-  s = download("http://ssd.jpl.nasa.gov/eph_spans.cgi?id=A") #Planets
-  f = open(s); rd = readall(f); close(f)
+  s = download("https://ssd.jpl.nasa.gov/eph_spans.cgi?id=A") #Planets
+  f = open(s); rd = readstring(f); close(f)
   #Read in bodynumber, begin time, " not " or " to " flag, end time, and file
   ssT = Array(AbstractString,(1,5))
-  off = 1; T1 = true; sss = []
+  off = 1; T1 = true; sss = Array(AbstractString,(0))
   while T1
-    ss=match(r"<td.*?>(\d+)</td>.*?<\w\w?>(.*?) (not|to) (.*?)</\w\w?>&nbsp;.*?&nbsp;(.*?)&nbsp;",rd[off:end])
+    ss=match(
+    r"<td.*?>(\d+)</td>.*?<\w\w?>(.*?) (not|to) (.*?)</\w\w?>&nbsp;.*?&nbsp;(.*?)&nbsp;",
+    rd[off:end])
     if ss == nothing
       T1 = false
     else
@@ -2558,7 +2625,8 @@ if isempty(tephf.numbers)
         ssT[ii] = ss.captures[ii]
       end
       if isempty(sss)
-        sss = copy(ssT)
+        append!(sss,ssT)
+        sss=reshape(sss, 1, length(sss))
       else
         sss = [sss; ssT]
       end
@@ -2575,8 +2643,8 @@ if isempty(tephf.numbers)
     end
   end
   sss = sss[:,[1:2;4:5]]
-  s = download("http://ssd.jpl.nasa.gov/eph_spans.cgi?id=B") #Satellites
-  f = open(s); rd = readall(f); close(f)
+  s = download("https://ssd.jpl.nasa.gov/eph_spans.cgi?id=B") #Satellites
+  f = open(s); rd = readstring(f); close(f)
   #Read in bodynumber, begin time, end time, and file (no need to flag " not "
   #or " to "
   ssT = Array(AbstractString,(1,4))
@@ -2627,12 +2695,12 @@ if isempty(tephf.numbers)
   tephf.numbers = sss[:,1]
   tephf.f = sss[:,4]
   tephf.tl =
-    [Dates.datetime2julian(DateTime(sss[:,2])) Dates.datetime2julian(DateTime(sss[:,3]))]-2451545.
+  [Dates.datetime2julian(DateTime(sss[:,2])) Dates.datetime2julian(DateTime(sss[:,3]))]-2451545.
 
-  s = download("http://ssd.jpl.nasa.gov/eph_spans.cgi?id=D") #Satellites
-  f = open(s); rd = readall(f); close(f)
+  s = download("https://ssd.jpl.nasa.gov/eph_spans.cgi?id=D") #Satellites
+  f = open(s); rd = readstring(f); close(f)
   ssT = Array(AbstractString,(1,2))
-  off = 1; T1 = true; ss1=[]
+  off = 1; T1 = true; ss1=Array(AbstractString,(0))
   while T1
     ss=match(r"&nbsp;(\S+) to (\S+)&nbsp;",rd[off:end])
     if ss == nothing
@@ -2656,14 +2724,15 @@ if isempty(tephf.numbers)
         (ssT[ii][6:8]=="Dec") && (ssT[ii]=ssT[ii][1:5]*"12"*ssT[ii][9:end])
       end
       if isempty(ss1)
-        ss1 = copy(ssT)
+        append!(ss1,ssT)
+        ss1=reshape(ss1, 1, length(ss1))
       else
         ss1 = [ss1; ssT]
       end
     end
   end
   tephf.sb =
-    [Dates.datetime2julian(DateTime(ss1[:,1])) Dates.datetime2julian(DateTime(ss1[:,2]))]-2451545.
+  [Dates.datetime2julian(DateTime(ss1[:,1])) Dates.datetime2julian(DateTime(ss1[:,2]))]-2451545.
   param(dict,"tephf",tephf)
 end
 return tephf
@@ -2673,8 +2742,8 @@ function getsatdat(dict::Dict)
 #Satellite data page, has GM and mean radius (& density, magnitude, albedo)
 sd=param(dict,"satdat")
 if isempty(sd)
-  s=download("http://ssd.jpl.nasa.gov/?sat_phys_par")
-  f = open(s); sd = readall(f); close(f)
+  s=download("https://ssd.jpl.nasa.gov/?sat_phys_par")
+  f = open(s); sd = readstring(f); close(f)
   T1 = search(sd,"Earth's Moon")
   if (T1 != 0:-1)
     sd = sd[T1[1]:end]
@@ -2686,18 +2755,18 @@ end
 return sd
 end
 
-function getpck(b::Int64,v::ASCIIString,dict::Dict)
+function getpck(b::Int64,v::String,dict::Dict)
 #NAIF pck file, analytic orientation & contains some small body radii and
 #orientation data not on Horizons
 pck=param(dict,"pck")
 if isempty(pck)
   s = download("ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/")
-  f = open(s); rd = readall(f); close(f)
+  f = open(s); rd = readstring(f); close(f)
   pck=match(r"pck\d+.tpc",rd).match
   #get latest file in directory
   s=download("ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/"*pck)
   #read contents to string
-  f = open(s); rd = readall(f); close(f)
+  f = open(s); rd = readstring(f); close(f)
   rd = replace(rd,"\n",";"); rd = replace(rd,"(","["); rd = replace(rd,")","]")
   #turn newlines into ; and parens into brackets for matlabese
   rd = replace(rd,"2431010","2000243")
@@ -2729,25 +2798,26 @@ end
 return d
 end
 
-function getx(b1,s::ASCIIString,dict::Dict)
+function getx(b1,s::String,dict::Dict)
 #get data from mb or sb structure
 x,_=getsbmb(b1,dict)
 ii=find(y->(y==b1),x.numbers) #get datastructure and see if body is there
 (length(ii)==1) && (ii = ii[1])
 if (!isempty(ii))&&(!param(dict,"ssd"))&&
-    (!isempty(find(y->(y==symbol(s)),fieldnames(x))))
+    (!isempty(find(y->(y==Symbol(s)),fieldnames(x))))
   #see if should skip saved data and if datafield exists
   #see if entry exists in field for body
-  if isempty(x.(symbol(s)))
+  if isempty(getfield(x,(Symbol(s))))
     o = []
-  elseif (typeof(x.(symbol(s))[1])==Float64)||(typeof(x.(symbol(s))[1])==Int64)
-    if length(x.(symbol(s)))>=ii
-      (!isnan(x.(symbol(s))[ii])) && (o=x.(symbol(s))[ii])
-      (isnan(x.(symbol(s))[ii])) && (o=[])
+  elseif (typeof(getfield(x,Symbol(s))[1])==Float64)||
+          (typeof(getfield(x,Symbol(s))[1])==Int64)
+    if length(getfield(x,Symbol(s)))>=ii
+      (!isnan(getfield(x,Symbol(s))[ii])) && (o=getfield(x,Symbol(s))[ii])
+      (isnan(getfield(x,Symbol(s))[ii])) && (o=[])
     end
-  elseif typeof(x.(symbol(s)))==Array{AbstractString,1}
-    if length(x.(symbol(s)))>=ii
-      (!isempty(x.(symbol(s))[ii])) && (o = x.(symbol(s))[ii])
+  elseif typeof(getfield(x,Symbol(s)))==Array{AbstractString,1}
+    if length(getfield(x,Symbol(s)))>=ii
+      (!isempty(getfield(x,Symbol(s))[ii])) && (o = getfield(x,Symbol(s))[ii])
     end
   else
     o=[]
@@ -2760,7 +2830,7 @@ end
 
 function getmb(dict::Dict)
 #major body list
-nn=download("http://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB")
+nn=download("https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB")
 f = open(nn); lines = readlines(f); close(f)
 
 NumNam = []
@@ -2799,7 +2869,7 @@ end
 
 #b = vcat(nums[1:10],nums[15:20],nums[22:23],nums[24:50],nums[160:end])
 x,_=getsbmb("mb",dict)
-b=copy(x.numbers)
+b=identity(x.numbers)
 jj = [] # see if body numbers already exist in data structure
 for ii in 1:length(b)
   T1 = find(x->(x==b[ii]),nums)
@@ -2828,20 +2898,20 @@ end
 
 function getsb(n,dict::Dict)
 #small body web pages
-if typeof(n) == ASCIIString #name or number
+if typeof(n) == String #name or number
   srch = escape(n)
 else
   srch=string(convert(Int64,n))
 end
-s = download(string("http://ssd.jpl.nasa.gov/sbdb.cgi?sstr=",srch))
-f = open(s); rd = readall(f); close(f)
+s = download(string("https://ssd.jpl.nasa.gov/sbdb.cgi?sstr=",srch))
+f = open(s); rd = readstring(f); close(f)
 ss = search(rd,r"\+1\"><b>[^<]+") #Name is bigger font "+1"
 if ss != 0:-1
   nam = rd[ss[8]:ss[end]]
   ss1 = search(rd,r">\d{7}<")
   nums = rd[ss1[2]:ss1[end-1]]
   nums = parse(Int64, nums)
-  if typeof(n) != ASCIIString && n != nums
+  if typeof(n) != String && n != nums
     println("SPK ID of ", n," has been changed to ", nums)
     n = [n nums]
   else
@@ -2960,10 +3030,10 @@ end
 
 function getsbmb(n,dict::Dict)
 #get small or major body structure
-if typeof(n)!=ASCIIString #should be 'mb' or 'sb'
+if typeof(n)!=String #should be 'mb' or 'sb'
   if n<1e6; bi="mb"; else; bi="sb"; end#convert number input to sb mb
 else
-  bi=copy(n)
+  bi=identity(n)
 end
 bo=param(dict,bi)
 if (bo == []) && (bi == "mb")#read from saved data
@@ -2973,8 +3043,8 @@ elseif (bo == []) && (bi == "sb")#read from saved data
   sb = SB([],[],[],[],[],[],[],[],[],[],[])
   param(dict,"sb",sb)
 elseif (isempty(bo.Names)) || (isempty(bo.numbers))
-  @windows? (bdf= string(param(dict,"bdir"),"\\bodydata.jld")):(bdf=
-              string(param(dict,"bdir"),"/bodydata.jld"))
+  @static is_windows()? (bdf = string(param(dict,"bdir"),"\\bodydata.jld")) :
+      (bdf = string(param(dict,"bdir"),"/bodydata.jld"))
   if isfile(bdf)
     boddict = load(bdf,"boddict") # this will give "md" or "sd" elements
     bo = boddict[bi]
@@ -3000,7 +3070,7 @@ if isempty(bb) #see if body exists in field
   (size(v,2) > size(v,1))? (v = [n v]) : (v = [n; v])
 end
 
-if typeof(f) == ASCIIString
+if typeof(f) == String
   flds = 1
 else
   flds = length(f)
@@ -3008,40 +3078,71 @@ end
 
 for ii in 1:flds
    #different fields
-  Nm = symbol("T")
+  Nm = Symbol("T")
   if flds == 1
-    Nm = symbol(f)
+    Nm = Symbol(f)
   else
-    Nm = symbol(f[ii])
+    Nm = Symbol(f[ii])
   end
-  if typeof(v[ii])==ASCIIString || (typeof(v[ii])==SubString{UTF8String})
+  if typeof(v[ii])==String || (typeof(v[ii])==SubString{String})
     #pad with spaces, then write
-    if isempty(x.(Nm))
-      x.(Nm) = Array(AbstractString,length(x.numbers))
+    if isempty(getfield(x, Nm))
+      setfield!(x, Nm, Array(AbstractString,length(x.numbers)))
     end
+    ct = 1
+    nn=size(getfield(x,Nm),1)+1
     for jj in bb
-      push!(x.(Nm), v[ii])
+      if bb[ct]- nn == 0
+        push!(getfield(x,Nm),v[ii])
+      elseif bb[ct]>nn
+        for kk in 1:bb[ct]-nn
+          push!(getfield(x,Nm)[nn-1+kk],"_")
+        end
+        push!(getfield(x,Nm),v[ii])
+      else
+        getfield(x,Nm)[jj]=v[ii]
+      end
+      ct = ct + 1
     end
   else
     #write, fill with nans
-    if isempty(x.(Nm))
+    if isempty(getfield(x, Nm))
       if Nm == :numbers
-        x.(Nm)=zeros(Int64,length(v[ii]))
+        setfield!(x,Nm,zeros(Int64,length(v[ii])))
+      elseif Nm == :pp && flds == 1
+        setfield!(x,Nm,NaN*zeros(length(x.numbers),length(v)))
       else
-        (isempty(x.numbers)) && (x.(Nm)=NaN*zeros(length(v[ii])))
-        (!isempty(x.numbers))&&(x.(Nm)=NaN*zeros(length(v[ii]),length(x.numbers)))
+        (isempty(x.numbers)) && (setfield!(x,Nm,NaN*zeros(length(v[ii]))))
+        (!isempty(x.numbers))&&(setfield!(x,Nm,NaN*zeros(length(x.numbers))))
       end
     end
-    nn=size(x.(Nm),2)+1
+    nn=size(getfield(x,Nm),1)+1
     ct = 1
     for jj in bb
-      if typeof(x.(Nm)[:,jj][1])==typeof(v[ii])
-        x.(Nm)[:,jj]=v[ii]
+      if bb[ct]- nn == 0
+        if typeof(getfield(x,Nm)[jj-1][1])==typeof(v[ii])
+          push!(getfield(x,Nm),v[ii])
+        else
+          push!(getfield(x,Nm),convert(typeof(getfield(x,Nm)[jj-1][1]),v[ii]))
+        end
+      elseif bb[ct]>nn
+        for kk in 1:bb[ct]-nn
+          push!(getfield(x,Nm)[nn-1+kk],NaN)
+        end
+        if typeof(getfield(x,Nm)[jj-1][1])==typeof(v[ii])
+          push!(getfield(x,Nm),v[ii])
+        else
+          push!(getfield(x,Nm),convert(typeof(getfield(x,Nm)[jj-1][1]),v[ii]))
+        end
       else
-        x.(Nm)[:,jj]=convert(typeof(x.(Nm)[:,jj][1]),v[ii])
-      end
-      if bb[ct]>nn
-        x.(Nm)[:,nn:bb[ct]-1]=NaN
+        if typeof(getfield(x,Nm)[jj][1])==typeof(v[ii])
+          if Nm == :pp && flds == 1
+            getfield(x,Nm)[jj,:]=v
+          end
+          getfield(x,Nm)[jj]=v[ii]
+        else
+          getfield(x,Nm)[jj]=convert(typeof(getfield(x,Nm)[jj][1]),v[ii])
+        end
       end
       ct = ct + 1
     end
@@ -3056,7 +3157,7 @@ function uniqstr(xni,bi,nb=[])
 #find a unique match of bi in xni
 (nb==[]) && (nb=0)
 #1 for only whole word matches, 2 for only fragment matches, 0 for either
-if typeof(xni) == ASCIIString
+if typeof(xni) == String
   T1 = false
   (contains(xni,bi)) && (T1=true)
 else
@@ -3104,51 +3205,13 @@ end
 return In
 end
 
-# function param(p::AbstractString)
-# #variables global to function, works with only single input
-# #saves p in local space and write v to p, then retrieve p from any function via o
-# fid = jldopen("vs.jld", "r+")
-# if exists(fid,p) # recalls v from saved space
-#   o=read(fid,p)
-# else # Output empty matrix
-#   o=[]
-# end
-# close(fid)
-# return o
-# end
-#
-# function param{T}(p::AbstractString,v::T)
-# #variables global to function, works with only single input
-# #saves p in local space and write v to p,
-# #  then retrieve p from any function via o
-# fid = jldopen("vs.jld", "r+")
-# # sets v to saved space and overwrites value if already there
-# if exists(fid, p)
-#   nt = length(names(fid))
-#   jj = find(x->(x==p),names(fid))
-#   fid2 = jldopen("vs2.jld","w")
-#   for ii in 1:nt
-#     if ii != jj[1]
-#       fid2[names(fid)[ii]] = read(fid[names(fid)[ii]])
-#     end
-#   end
-#   close(fid); close(fid2)
-#   rm("vs.jld"); mv("vs2.jld","vs.jld")
-#   fid = jldopen("vs.jld","r+")
-# end
-# fid[p] = v
-# o = []
-# close(fid)
-# return o
-# end
-
-function param(vs::Dict,key::ASCIIString,value)
+function param(vs::Dict,key::String,value)
 # Allows a variety of values to be stored in RAM under one name
 # Sets value to dictionary structure
 vs[key] = value
 end
 
-function param(vs::Dict,key::ASCIIString)
+function param(vs::Dict,key::String)
 # Recalls value from dictionary structure
 # If not in dictionary, returns empty matrix
 if !haskey(vs,key)
@@ -3177,7 +3240,8 @@ end
 
 end
 
-function pval!{T}(pp::Dict,xx::AbstractArray{T},order::Int64,v::AbstractArray{T})
+function pval!{T}(pp::Dict,xx::AbstractArray{T},order::Int64,
+            v::AbstractArray{T})
 # Assumes that xx is sorted from smallest to largest
 # pp is dictionary
 # xx is a 1 x n or n x 1
@@ -3233,7 +3297,8 @@ end
 end
 
 
-function p3val!{T}(pp::Dict,xx::AbstractArray{T},order::Int64,v::AbstractArray{T})
+function p3val!{T}(pp::Dict,xx::AbstractArray{T},order::Int64,
+            v::AbstractArray{T})
 # Assumes that xx is sorted from smallest to largest
 # pp is dictionary
 # output dimension is always 3
@@ -3288,7 +3353,7 @@ end
 
 end
 
-function getfn(fn::ASCIIString,b::AbstractArray{Int64},dict::Dict)
+function getfn(fn::String,b::AbstractArray{Int64},dict::Dict)
   a = []
   if (fn == "gm") || (fn=="GM")
     a = getgm(b,dict)
@@ -3299,7 +3364,7 @@ function getfn(fn::ASCIIString,b::AbstractArray{Int64},dict::Dict)
   if (fn=="j2") || (fn=="J2")
     a = getj2(b,dict)
   end
-  if (fn=="rot") || (fn=="rotational_period") || (fn=="ROT")
+  if (fn=="rot") || (fn=="rotation_period") || (fn=="ROT")
     a = getrot(b,dict)
   end
   if (fn=="occ")
