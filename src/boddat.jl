@@ -174,10 +174,10 @@ else
 end
 
 if size(t,2)>size(t,1)
-  t = transpose(t[1:end-1])
+  t = transpose(t)
 end
-(typeof(t[1])==Int64) && (t = t*1.)
 
+(typeof(t[1])==Int64) && (t = t*1.)
 
 #default options is [true false true], replace with any input and save in params
 opts=[true false true]
@@ -1160,7 +1160,7 @@ end#for ibu
 return xx
 end
 
-function ephem(b::AbstractArray{Int64},t::Array{Float64,1},
+function ephem(b::AbstractArray{Int64},t::AbstractArray{Float64},
                     typ::Bool,bvi::Int64,dict::Dict)
 #ephemeris
 # typ is if t is a linspace (true) or if t is vector (false)
