@@ -163,21 +163,21 @@ end
 #if there's no time, the time is now
 if isempty(t)
   t = [Dates.datetime2julian(now())-2451545.]
-  typ = false
-else
-  typ = t[end]
-  if (typ==1)||(typ==0)||(typeof(typ)==Bool)
-    typ = typ!=0
-    t = t[1:end-1]
-  else
-    warn("Flag not included at end of time array to create interval")
-    typ = false
-  end
-  if size(t,2)>size(t,1)
-    t = transpose(t[1:end-1])
-  end
-  (typeof(t[1])==Int64) && (t = t*1.)
 end
+
+if typeof(t) == FloatRange{Float64}
+  typ = true
+  collect(t)
+  t = [t[1]; t[end]; t[2]-t[1]]
+else
+  typ = false
+end
+
+if size(t,2)>size(t,1)
+  t = transpose(t)
+end
+
+(typeof(t[1])==Int64) && (t = t*1.)
 
 #default options is [true false true], replace with any input and save in params
 opts=[true false true]
