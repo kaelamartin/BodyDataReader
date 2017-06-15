@@ -1306,7 +1306,7 @@ end
 return X
 end
 
-function ephem1(bib::Int64,t::Array{Float64,1},typ::Bool,
+function ephem1(bib::Int64,t::AbstractArray{Float64},typ::Bool,
                   bvi::Int64,dict::Dict)
 n=6
 if bvi==4
