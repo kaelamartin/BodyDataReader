@@ -219,10 +219,18 @@ if (isempty(find(x->(typeof(x)==String),bi)))
 else
   be=getnum(bi,dict)
 end
-b = zeros(Int64,size(be))
+if iszero(imag(be))
+  b = zeros(Int64,size(be))
+else
+  b = zeros(Union{Complex{Int64},Int64},size(be))
+end
 
 for ii in 1:length(be)
-  b[ii]=convert(Int64,be[ii])
+  if iszero(imag(be[ii]))
+    b[ii]=convert(Int64,real(be[ii]))
+  else
+    b[ii] = convert(Complex{Int64},be[ii])
+  end
 end #if size(be,1)>2;be=be';end;b=be(1,:);
 
 #input body parameter variables, if not a cell array then cellstr or split by
@@ -324,7 +332,7 @@ for bvr in 1:nvars
   elseif bvi==7#central body, matches bi for name vs number output
     cb=10*ones(Int64,length(b))
     for jj in 1:length(b)
-      if (b[jj]>10)&&(b[jj]<1000) && (mod(convert(Int64,real(b[jj])),100)!=99)
+      if (real(b[jj])>10)&&(real(b[jj])<1000) && (mod(convert(Int64,real(b[jj])),100)!=99)
         cb[jj] = floor(b[jj]/100)*100 + 99
       end
       (!iszero(imag(b[jj]))) && (cb[jj] = real(b[jj]))
@@ -441,8 +449,16 @@ mb = param(dict,"mb")
 # sav = false
 
 #change into string, bi is used in central body output
-(typeof(bi)==String) && (b = Array{String}(1))
-(typeof(bi)!=String) && (b = Array{Int64}(size(bi)))
+if typeof(bi)==String
+  b = Array{String}(1)
+elseif typeof(bi)!=String
+  if any(x->contains(x,"_CP"),bi[find(x->typeof(x)==String,bi)])
+    b = Array{Union{Complex{Int},Int}}(size(bi))
+  else
+    b = Array{Int64}(size(bi))
+  end
+end
+
 for ib in 1:length(bi)
   if typeof(bi[ib])!=String
     b[ib] = convert(Int64,bi[ib])
@@ -452,7 +468,7 @@ for ib in 1:length(bi)
   end
   if contains(bi[ib],"_CP")
     nbcp = true
-    replace(bib,"_CP","")
+    bib = replace(bib,"_CP","")
   else
     nbcp = false
   end
@@ -500,10 +516,10 @@ for ib in 1:length(bi)
       b[ib]=x.numbers[In[1]]
     end
   end#mb word
-(nbcp) && (b[ib]=b[ib]+1im)
-if (typeof(b[ib])!=Float64) || (typeof(b[ib])!=Float64)
+  if nbcp
+    b[ib]=b[ib]+1im
+  end
   b[ib] = b[ib][1]
-end
 end#for ib
 param(dict,"mb",mb)
 return b
@@ -511,7 +527,11 @@ end
 
 function getnumout{T}(bi::AbstractArray{T},dict::Dict)
 
-bo = zeros(length(bi))
+if iszero(imag(bi))
+  bo = zeros(Int64,size(bi))
+else
+  bo = zeros(Union{Complex{Int64},Int64},size(bi))
+end
 for ib in 1:length(bi)
   b1=identity(bi[ib])
   if !iszero(imag(b1))
@@ -601,17 +621,20 @@ end#for ib
 return nn
 end
 
-function getgm(bs::AbstractArray{Int64},dict::Dict)
+function getgm{T}(bs::AbstractArray{T},dict::Dict)
 # GM from ephemeris header constants unless = 0, then estimate from
 #   density and size
 gmx=zeros(length(bs))
 for jj in 1:length(bs)
   b=identity(bs[jj])
-  (!iszero(imag(b))) && (gm=NaN)
-  (iszero(imag(b))) && (gm=getx(b,"gm",dict)) #check saved data (& no ssd flag)
-  if (!isempty(gm)) && (gm !=NaN)#found it
+  if !iszero(imag(b))
+    gm=NaN
+  else
+    gm=getx(b,"gm",dict) #check saved data (& no ssd flag)
+  end
+  if (!isempty(gm)) #found it
   elseif b<1e6
-    ed=getephdat(floor(Int64,b),dict) #major body, check ephemeris header for
+    ed=getephdat(b,dict) #major body, check ephemeris header for
     # GM>1e-9
       if (!isempty(ed)) && (ed["gm"*string(floor(Int64,b))][1]>1e-9)
         gm=ed["gm"*string(floor(Int64,b))][1]
@@ -671,7 +694,7 @@ end
 return j2x
 end
 
-function getrad(bs::AbstractArray{Int64},dict::Dict)
+function getrad{T}(bs::AbstractArray{T},dict::Dict)
 rx=zeros(Float64,length(bs))
 for jj in 1:length(bs)
   b=bs[jj]
@@ -1020,7 +1043,7 @@ tb=false
 if typ #match t and b 1-to-1 if numel(tt)==numel(bb)
   tt = collect(tt[1]:tt[3]:tt[2])
 else
-  tt=transpose(tt[:])'
+  tt=tt[:]
   tb=length(tt)==length(bb)
 end
 
@@ -1045,7 +1068,7 @@ end
 cl2=ceil(Int,ll/2)
 if ll == 1 || ll == 3
   n = (3,length(tt))
-elseif ll == 4 || ll == 2
+elseif ll == 4 || ll == 2 || ll == 6
   n = (9,length(tt))
 elseif ll == 5
   n = (3,1)
@@ -1096,7 +1119,7 @@ for ibu in 1:length(bb)
       #get H
       sav=param(dict,"save")
       param(dict,"save",false)
-      X,_=ephem1(b,[0.],typ,3,dict)
+      X,_=ephem1(b,[0.],false,3,dict)
       param(dict,"save",sav)
       #equinox
       X=cross(P,cross(X[1:3],X[4:6]))
@@ -1137,7 +1160,7 @@ for ibu in 1:length(bb)
     X = zeros(3,size(P,2))
     T1 = qorient([399],[0.],typ,1,dict)
     for ii in size(P,2)
-      X[:,ii]=cross(T1,P[:,ii])
+      X[:,ii]=cross(T1[:,ii],P[:,ii])
       X[:,ii] = X[:,ii]/sqrt(dot(X[:,ii],X[:,ii]))
     end
   end
@@ -1147,7 +1170,7 @@ for ibu in 1:length(bb)
       X[:,ii] = [T1[:,ii];cross(P[:,ii],T1[:,ii]);P[:,ii]]
     end
   end
-  (cl2!=2) && (X=repmat(X,size(t))) #match size of t
+  (cl2!=2) && (X=repmat(X,size(t,2),size(t,1))) #match size of t
 
   if tb
     xx[:,ibu]=X
@@ -1158,7 +1181,7 @@ end#for ibu
 return xx
 end
 
-function ephem(b::AbstractArray{Int64},t::AbstractArray{Float64},
+function ephem{T}(b::AbstractArray{T},t::AbstractArray{Float64},
                     typ::Bool,bvi::Int64,dict::Dict)
 #ephemeris
 # typ is if t is a linspace (true) or if t is vector (false)
@@ -1186,7 +1209,11 @@ if !typ
 end
 
 if size(b,1)==1
-  b =[b; NaN*ones(b)]
+  if iszero(imag(b))
+    b =[real(b); NaN*ones(size(b))]
+  else
+    b = [real(b); NaN*ones(size(b))] +   [imag(b).*im; zeros(size(b))]
+  end
 end#b(2,:) is wrt body list
 
 it = collect(1:1:size(b,2))
@@ -1222,6 +1249,10 @@ for ibu in 1:size(b,2)
   end
   bib=b[1,ibu]; b0b=b[2,ibu] #bib is target, b0b is wrt
   (typeof(bib)==Float64) && (bib = convert(Int64,bib))
+  if typeof(bib) == Complex{Float64}
+    (iszero(imag(bib))) ? (bib = convert(Int64,real(bib))) :
+          (bib = convert(Complex{Int64},bib))
+  end
   if isnan(b0b) #wrt cetral body, no need to "tree" body center
     #get state, X, from ephem1 function
     if tb #match 1-to-one, or all times per body
@@ -1230,6 +1261,7 @@ for ibu in 1:size(b,2)
       X[:,:,ibu],_=ephem1(bib,t,typ,bvi,dict)
     end
   else#wrt some specified body, may need to tree
+  (typeof(b0b)==Float64) && (b0b = convert(Int64,b0b))
     if tb
       tt=[t[ibu]]
     else
@@ -1239,11 +1271,11 @@ for ibu in 1:size(b,2)
       end
     end#match 1-to-one, or all times per body
     if bib==b0b#target=wrt, X=0
-        if typ
-          tt=collect(t[1]:t[3]:t[2])
-        end
-        Xb=zeros(6,length(tt))
-        Xb0=0
+      if typ
+        tt=collect(t[1]:t[3]:t[2])
+      end
+      Xb=zeros(n,length(tt))
+      Xb0=0
     else#compute ephemeris
       cb=10
       if !iszero(imag(bib))
@@ -1260,11 +1292,11 @@ for ibu in 1:size(b,2)
         lcb=max(cb,cb0)
       end#lowest central body (planet or sun)
       if !typ
-        Xb = Array{Float64}(length(tt),1)
-        Xb0 = Array{Float64}(length(tt),1)
+        Xb = zeros(n,length(tt))
+        Xb0 = zeros(n,length(tt))
       else
-        Xb = Array{Float64}(length(tt[1]:tt[3]:tt[2]),1)
-        Xb0 = Array{Float64}(length(tt[1]:tt[3]:tt[2]),1)
+        Xb = zeros(n,length(tt[1]:tt[3]:tt[2]))
+        Xb0 = zeros(n,length(tt[1]:tt[3]:tt[2]))
       end
       if lcb!=bib
         Xb,_=ephem1(bib,tt,typ,bvi,dict)
@@ -1290,9 +1322,9 @@ for ibu in 1:size(b,2)
       X[:,:,ibu]=Xb-Xb0
     elseif size(b,2) == 1
       if !typ
-        X = zeros(6,length(t),1)
+        X = zeros(n,length(t),1)
       else
-        X = zeros(6,length(t[1]:t[3]:t[2]),1)
+        X = zeros(n,length(t[1]:t[3]:t[2]),1)
       end
       X[:,:,ibu]=Xb-Xb0
     else
@@ -1304,20 +1336,26 @@ end
 return X
 end
 
+function ephem1(bib::Complex{Int64},t::AbstractArray{Float64},typ::Bool,
+                  bvi::Int64,dict::Dict)
+n=6
+if bvi==4
+  n=12
+end
+#non-body control point
+if typ
+  t=collect(t[1]:t[3]:t[2])
+end
+X=zeros(n,length(t))
+return X,t
+end
+
 function ephem1(bib::Int64,t::AbstractArray{Float64},typ::Bool,
                   bvi::Int64,dict::Dict)
 n=6
 if bvi==4
   n=12
 end
-if !iszero(imag(bib)) #non-body control point
-  if typ
-    t=collect(t[1]:t[3]:t[2])
-  end
-  X=zeros(n,length(t))
-  return
-end
-
 #get saved data, ideph is list of body numbers, deph is spline data
 id=param(dict,"ideph")
 d=param(dict,"deph") #clear double so can overwrite as struct
@@ -1459,23 +1497,23 @@ ist=falses(length(t))
 #see if data is out of bounds
 tl=d[ii]["breaks"][1]
 if minimum(t)<tl
-  ii = find(x->(x<tl),t)
-  for jj in ii
+  kk = find(x->(x<tl),t)
+  for jj in kk
     ist[jj] = true
   end
   warn("Min time for ",bib," ephem spline is ",Dates.julian2datetime(tl+2451545))
 end
 tl=d[ii]["breaks"][end]
 if maximum(t)>tl
-  ii = find(x->(x>tl),t)
-  for jj in ii
+  kk = find(x->(x>tl),t)
+  for jj in kk
     ist[jj] = true
   end
   warn("Max time for ",bib," ephem spline is ",Dates.julian2datetime(tl+2451545))
 end
 if any(ist) #ist is indeces of data outside of spline range
   ts=t[ist]
-  t[ist]=[]
+  deleteat!(t,ist)
 end
 
 X=zeros(6,length(t))
@@ -1772,11 +1810,11 @@ end
 id=param(dict,"idori")
 d=param(dict,"dori")
 (isempty(d)) && (d= Dict()) # d is a dictionary
-(isempty(id)) && (id = zeros(Int64,(length(bb),3)))
+# (isempty(id)) && (id = zeros(Int64,(length(bb),3)))
 
 tb=false #match t and b 1-to-1 if numel(t)==size(b,2)
 if !typ
-  tt=transpose(tt[:])'
+  tt=tt[:]
   tb=length(tt)==length(bb)
 end
 
@@ -1800,7 +1838,7 @@ end
 
 if ll == 1 || ll == 3
   (!typ) ? (nn = (3,length(tt))) : (nn = (3,length(collect(tt[1]:tt[3]:tt[2]))))
-elseif ll == 4 || ll == 2
+elseif ll == 4 || ll == 2 || ll == 6
   (!typ) ? (nn = (9,length(tt))) : (nn = (9,length(collect(tt[1]:tt[3]:tt[2]))))
 elseif ll == 5
   nn = (3,1)
@@ -1827,11 +1865,11 @@ for ibu in 1:length(bb) #match times for each unique body
     end
   end
   bib=bb[ibu]
-  tb? (t=tt[ibu]) : (t=tt)
+  tb? (t=[tt[ibu]]) : (t=tt)
 
   #small body orientation not in Horizons, may be in pck file. write xx 1-to-1 if tb
   if bib>1e3
-    X=qorient(bib,t,ll,dict)
+    X=qorient([bib],t,typ,ll,dict)
     if tb
       xx[:,ibu]=X
     else
@@ -1863,7 +1901,7 @@ for ibu in 1:length(bb) #match times for each unique body
   if isempty(ii)||ssd#read from file or horizons
     if ssd #te is saved time span
       te=t
-      (length(te)==3) ? (typ2 = true) : (typ2 = false)
+      typ2 = typ
     else
       te=[-.5; 60*365.25;.1]
       typ2 = true
@@ -1980,16 +2018,14 @@ for ibu in 1:length(bb) #match times for each unique body
         #,datestr(err[2]+730486.5))
       end
     #save data if no error and didn't read from existing file
-  elseif (!rf) && (param(dict,"save")) && all(.!(err))
+    elseif (!rf) && (param(dict,"save")) && all(.!(err))
       fid = jldopen(edir,"w")
       fid["di"] = di
       close(fid)
     end
 
     if !ssd#make spline if not ssd flag
-      if id==zeros(Int64,1,3)
-        ii = 1
-      elseif !isempty(ij)
+      if !isempty(ij)
         ii=ij[1]
       else
         ii=size(id,1)+1
@@ -2358,7 +2394,6 @@ for ti in 1:n12-1#only do mnt at a time
         X = [X XT]
       end
     catch
-      X=zeros(7,0)
       X1 = readlines(s)
       X1 = X1[i1+1:i2-1]
       nl = div(i2-i1-1,3)
@@ -2391,13 +2426,13 @@ for ti in 1:n12-1#only do mnt at a time
   end
 end#ti
 if iszero(nt1) && iszero(nt2)
-  tt=transpose(X[1,:]-2451545.)
+  tt=X[1,:]-2451545.
 elseif nt1 == 0
-  tt=[X[1,:].'-2451545. transpose(tt[end-nt2+1:end])]
+  tt=[X[1,:]-2451545.; tt[end-nt2+1:end]]
 elseif iszero(nt2)
-  tt=[transpose(tt[1:nt1]) X[1,:].'-2451545.]
+  tt=[tt[1:nt1]; X[1,:]-2451545.]
 else
-  tt=[transpose(tt[1:nt1]) X[1,:].'-2451545. transpose(tt[end-nt2+1:end])]
+  tt=[tt[1:nt1]; X[1,:]-2451545.; tt[end-nt2+1:end]]
 end
 
 
@@ -2418,7 +2453,7 @@ if (param(dict,"save")) && (isempty(ll)) #save ephemeris data
   @static is_windows()? (f= edir*"\\"*string(n)*".jld") :
       (f= edir*"/"*string(n)*".jld")
   fid = jldopen(f,"w")
-  d=[tt;X]
+  d=[tt.';X]
   if !typ
     d=d[:,ist]
   end
@@ -2441,7 +2476,7 @@ if (param(dict,"save")) && (isempty(ll)) #save ephemeris data
             [tephf.f[ieph,:] Dates.datetime2julian(now())-2451545.],dict)
   end
 end # save
-return X,tt,err
+return X,tt.',err
 end
 
 function getephdat(b::Int64,dict::Dict)
@@ -2814,7 +2849,7 @@ if (!isempty(ii))&&(!param(dict,"ssd"))&&
         (!isnan(getfield(x,Symbol(s))[ii])) && (o=getfield(x,Symbol(s))[ii])
         (isnan(getfield(x,Symbol(s))[ii])) && (o=[])
       else
-        if any(!isnan.(!isnan(getfield(x,Symbol(s))[ii,:])))
+        if any(.!isnan.(.!isnan.(getfield(x,Symbol(s))[ii,:])))
           o=getfield(x,Symbol(s))[ii,:]
         else
           o=[]
@@ -3191,7 +3226,8 @@ if (length(In) > 1) && (nb == 1) #multiple entries with same word
   end
   (isempty(In)) && (warn("ambiguous string match"))
 elseif (length(In) > 1)  && (nb!=1)
-    if any(x->(x==xni[In[1]]),xni[In[2:end]])
+    if any(xni[In] .== bi)
+    elseif any(x->(x==xni[In[1]]),xni[In[2:end]])
       warn("ambiguous string match")
     elseif any(x->(x[1:3]==xni[In[1]][1:3]),xni[In[2:end]])
       warn("ambiguous string match")
@@ -3362,7 +3398,7 @@ end
 
 end
 
-function getfn(fn::String,b::AbstractArray{Int64},dict::Dict)
+function getfn{T}(fn::String,b::AbstractArray{T},dict::Dict)
   a = []
   if (fn == "gm") || (fn=="GM")
     a = getgm(b,dict)
