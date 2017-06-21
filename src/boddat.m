@@ -96,13 +96,13 @@ function varargout=boddat(bvars,bi,t,opti)
 %   {start, end, delta}, rather than a list of discrete times.
 
 %SOURCES
-%small body data http://ssd.jpl.nasa.gov/sbdb.cgi
-%Horizons ephemeris and orientation http://ssd.jpl.nasa.gov/horizons_batch.cgi
-%list of major bodies http://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB
-%Ephemeris file names and time spans http://ssd.jpl.nasa.gov/eph_spans.cgi
+%small body data https://ssd.jpl.nasa.gov/sbdb.cgi
+%Horizons ephemeris and orientation https://ssd.jpl.nasa.gov/horizons_batch.cgi
+%list of major bodies https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB
+%Ephemeris file names and time spans https://ssd.jpl.nasa.gov/eph_spans.cgi
 %Inner planet, sun & barycenter GM, planet radius J2 ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/
 %Outer planet & satellite GM, planet radius J2 ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/
-%Satellite GM and mean radius http://ssd.jpl.nasa.gov/?sat_phys_par
+%Satellite GM and mean radius https://ssd.jpl.nasa.gov/?sat_phys_par
 %analytic orientation and radii ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/
 
 
@@ -145,8 +145,7 @@ if bvi<5;%ephemeris, {R V X A}
         a=Xeph;if bvi==1;a=a(1:3,:,:);elseif bvi==2;a=a(4:6,:,:);end
 elseif bvi==5;Xeph=ephem(be,t,3);R=Xeph(1:3,:,:);H=cross(R,Xeph(4:6,:,:));a=cat(1,unit(R),unit(cross(H,R)),unit(H));
 elseif bvi==6;a=getnumout(b);%number
-elseif bvi==7%central body, matches bi for name vs number output
-    cb=10*ones(size(b));ii=b>10&b<1000&mod(real(b),100)~=99;cb(ii)=floor(b(ii)/100)*100+99;ii=find(imag(b));cb(ii)=real(b(ii));
+elseif bvi==7;cb=cbfun(b);%central body, matches bi for name vs number output
     if isnumeric(bi);a=cb;else;a=bi;for ib=1:numel(bi);if isnumeric(bi{ib});a{ib}=cb(ib);else;a(ib)=getnam(cb(ib));end;end;end
 %8--19 calls a function called getxxx, where xxx is first three letters of matching bva parameter. only input is b
 elseif bvi==8;a=getnam(b);%name, works for NonBodyControlPoints
@@ -185,9 +184,17 @@ b=zeros(size(bi));%initialize b to same size as bi
 for ib=1:numel(bi)
 if isnumeric(bi{ib});b(ib)=bi{ib};continue;else;bib=upper(strtrim(bi{ib}));end
 if strfind(bib,'_CP');nbcp=1;bib=strrep(bib,'_CP','');else;nbcp=0;end
-if isnumeric(bib);b(ib)=bib;%already a number
+if isnumeric(bib);error('getnum b(ib)=bib;%already a number');end%delete
+x=getsbmb('mb');if isempty(mb)&&(isempty(x.names)||params('ssd'));x=getmb;end;mb=x;%get mb from saved data unless empty or ssd flagged
+
+L=regexp(bib,'L\d','match');%Lagrange point
+if ~isempty(L);L=str2double(L{1}(2));
+bib=regexp(regexprep(bib,'L\d',''),'[_-\s]','split');bib(cellfun('isempty',bib))=[];
+n=getnum(bib);nb=numel(bib);if any(isnan(n))||nb<1||nb>2||L>5;error('%s is an ambiguous Lagrange point',bi{ib});end
+if nb==1;n(2)=cbfun(n);end;if n(1)==cbfun(n(2));n=n([2 1]);elseif n(2)~=cbfun(n(1));error('%s is an ambiguous Lagrange point',bi{ib});end
+b(ib)=n(1)*10+L;if ~any(b(ib)==x.numbers);putsbmb(b(ib),'numbers',b(ib));bib=getnam(n);putsbmb(b(ib),'names',sprintf('%s-%s L%d',bib{[2 1]},L));end
+
 else%match a string
-    x=getsbmb('mb');if isempty(mb)&&(isempty(x.names)||params('ssd'));x=getmb;end;mb=x;%get mb from saved data unless empty or ssd flagged
     in=uniqstr(x.names,bib,1);%check whole word in major body data
     if isempty(in);x=getsbmb('sb');sb=x;in=uniqstr(x.names,bib,1);%check whole word in small body data
     if isempty(in)||params('ssd');uniqsb(bib);x=getsbmb('sb');sb=x;in=uniqstr(x.names,bib,1);end%check ssd webpages
@@ -211,6 +218,7 @@ b=bi(ib);if imag(b);nbcp=1;b=real(b);else;nbcp=0;end
 if isnan(b);n=b;else
 n=getx(b,'numbers');%check saved data (& no ssd flag)
 if ~isempty(n)%found it
+elseif b>1e3&&b<1e4&&mod(b,10)<6;n=b;%Lagrange point
 elseif b<1e6;x=getmb;n=find(b==x.numbers);%check list of major bodies
     if ~isempty(n);n=x.numbers(n);else;n=nan;end
 else;n=getsb(b);n=n{1};%check ssd
@@ -230,6 +238,9 @@ for ib=1:numel(bs)
 b=bs(ib);if imag(b);nbcp=1;b=real(b);else;nbcp=0;end
 n=getx(b,'names');%check saved data (& no ssd flag)
 if ~isempty(n)%found it
+elseif b>1e3&&b<1e4&&mod(b,10)<6;L=mod(b,10);%Lagrange point
+    b=floor(b/10);n={};n=[cbfun(b) b];n=getnam(n);
+    n=sprintf('%s-%s L%d',n{:},L);putsbmb(10*b+L,'names',n);putsbmb(10*b+L,'numbers',10*b+L);
 elseif b<1e6;x=getmb;n=find(b==x.numbers);%check list of major bodies
     if ~isempty(n);n=deblank(x.names(n,:));end
 else;n=getsb(b);%check ssd
@@ -252,6 +263,7 @@ gmx=zeros(size(bs));
 for jj=1:numel(bs)
 b=bs(jj);if imag(b);gm=nan;else;gm=getx(b,'gm');end%check saved data (& no ssd flag)
 if ~isempty(gm);%found it
+elseif b>1e3&&b<1e4&&mod(b,10)<6;gm=nan;putsbmb(b,'gm',gm);%Lagrange point
 elseif b<1e6;ed=getephdat(b);%major body, check ephemeris header for GM > 1e-9
     if ~isempty(ed)&&ed.(['gm' num2str(b)])>1e-9;gm=ed.(['gm' num2str(b)]);putsbmb(b,'gm',gm);
     %read general satellite page, get first # after >name < and ">"
@@ -282,6 +294,7 @@ rx=zeros(size(bs));
 for jj=1:numel(bs)
 b=bs(jj);if imag(b);r=nan;else;r=getx(b,'rad');end%check saved data (& no ssd flag)
 if ~isempty(r)%found it
+elseif b>1e3&&b<1e4&&mod(b,10)<6;r=nan;putsbmb(b,'rad',r);%Lagrange point
 elseif b<1e6&mod(b,100)==99|b==10;ed=getephdat(b);r=ed.(['rad' num2str(b)]);
 if isempty(r);r=gettri(b);r=r(1);end;putsbmb(b,'rad',r);%planet or sun, ephemeris header
             %satellite, read general satellite page, get second # after >name < and ">"
@@ -368,7 +381,7 @@ cada=cell(size(bs));
 %ssd=params('ssd');params('ssd',true)%for getnum
 for jj=1:numel(bs);b=bs(jj);if imag(b);cada{jj}='';continue;end
 if b<1e6;cada{jj}=[];continue;end%only for small bodies
-s=curl(sprintf('http://ssd.jpl.nasa.gov/sbdb.cgi?sstr=%d;cad=1',b));
+s=curl(sprintf('https://ssd.jpl.nasa.gov/sbdb.cgi?sstr=%d;cad=1',b));
 if jj/100==round(jj/100);fprintf('Close approach progress: %.0f%%\n',jj/numel(bs)*100);end
 ca=regexp(s,'<tr>  (.+?)</tr>','tokens');cad=[];
 for ii=1:numel(ca);
@@ -467,7 +480,7 @@ if size(b,1)==1;b(2,:)=nan;end%b(2,:) is wrt body list
 for ibu=1:size(b,2)
 ii=ibu==it;%match times for each unique body
 bib=b(1,ibu);b0b=b(2,ibu);%bib is target, b0b is wrt
-if isnan(b0b)%wrt cetral body, no need to "tree" body center
+if isnan(b0b)%wrt central body, no need to "tree" body center
 %get state, X, from ephem1 function
 if tb;X(:,ii)=ephem1(bib,t(ii),bvi);
 else;X(:,:,ii)=repmat(ephem1(bib,t,bvi),[1 1 sum(ii)]);end%match 1-to-one, or all times per body
@@ -478,12 +491,15 @@ if bib==b0b%target=wrt, X=0
     if iscell(t);tt=[t{1}:t{3}:t{2}];end
     Xb=zeros(6,numel(tt));Xb0=0;
 else%compute ephemeris
-cb=10;if imag(bib);cb=real(bib);elseif bib>10&bib<1000&mod(real(bib),100)~=99;cb=floor(bib/100)*100+99;end%central body of target
-cb0=10;if b0b>10&b0b<1000&mod(b0b,100)~=99;cb0=floor(b0b/100)*100+99;end%central body of wrt body
+cb=cbfun(bib);cb0=cbfun(b0b);%central body of target and wrt body
 lcb=10;if (cb~=10|cb0~=10) & (cb==cb0|cb==b0b|bib==cb0);lcb=max(cb,cb0);end%lowest central body (planet or sun)
 
-Xb =0;if lcb~=bib;Xb=ephem1(bib,tt,bvi);if lcb~=cb;Xb=Xb+ephem1(cb,tt,bvi);end;end%get target state wrt lcb
-Xb0=0;if lcb~=b0b;Xb0=ephem1(b0b,tt,bvi);if lcb~=cb0;Xb0=Xb0+ephem1(cb0,tt,bvi);end;end%get "wrt body" state wrt lcb 
+Xb =0;if lcb~=bib;Xb=ephem1(bib,tt,bvi);if lcb~=cb;Xb=Xb+ephem1(cb,tt,bvi);
+        cbb=cbfun(cb);if lcb~=cbb;Xb=Xb+ephem1(cbb,tt,bvi);end
+    end;end%get target state wrt lcb
+Xb0=0;if lcb~=b0b;Xb0=ephem1(b0b,tt,bvi);if lcb~=cb0;Xb0=Xb0+ephem1(cb0,tt,bvi);
+        cbb=cbfun(cb0);if lcb~=cbb;Xb0=Xb0+ephem1(cbb,tt,bvi);end
+    end;end%get "wrt body" state wrt lcb 
 end%if bib
 
 %X-Xb0 is target state wrt "wrt body" state
@@ -506,7 +522,7 @@ elseif err(2);warning('Max Horizons ephem time for %d is %s\n',bib,datestr(err(2
 if bvi==4;warning('no accel or jerk from Horizons');end
 return;end%return state
 
-if bib>10&bib<1e3&mod(bib,100)~=99;cb=floor(bib/100)*100+99;else;cb=10;end%central body, treat planets and satellites differently
+cb=cbfun(bib);%central body, treat planets and satellites differently
 ii=find(id==bib);%see if saved data exists
 if isempty(ii);
 file=[params('bdir') 'ephem/' num2str(bib)];%see if file exists
@@ -720,9 +736,9 @@ end%for ibu
 return
 
 function [X tt err]=mkeph(n,t,ll)
-%read from horizons
+if n<1e3||n>1e6%read from horizons
 err=0;tephf=getef;%get ephemeris time span
-if n>10&n<1e3&mod(n,100)~=99;cb=floor(n/100)*100+99;else;cb=10;end%get data wrt central body
+cb=cbfun(n);%get data wrt central body
 if n>1e6&n<2e6;CAP='%3BCAP';else;CAP='';end%comets are dumb
 if n>1e6;tlim=tephf.sb;DES='DES=';ieph=1;%time limits for small bodies
 else;ieph=tephf.numbers==n;tlim=tephf.tl(ieph,:);DES='';end%time limits for bog bodies
@@ -745,7 +761,7 @@ else;tstr=['&TLIST=''' sprintf('%.9f%%0A',tt(t12(ti)+1:t12(ti+1))+51544.5) '''']
 %set target as center of body and observer as ll (lat,lon) for orientation
 if nargin>2;cb=n;coord='coord';llstr=sprintf('&COORD_TYPE=''GEODETIC''&SITE_COORD=''%.8f,%.8f,0''',ll);else;coord='';llstr='';end
 
-url=sprintf(['http://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1'...horizons url mumbojumbo
+url=sprintf(['https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1'...horizons url mumbojumbo
 '&COMMAND=''%s%d%s'''...
 '&CENTER=''%s@%d'''...
 '%s',...
@@ -770,14 +786,53 @@ tt=[tt(1:nt1) X(1,:)-2451545 tt(end-nt2+1:end)];
 X=[nan*ones(6,nt1) (1-2*(nargin>2))*X(2:7,:) nan*ones(6,nt2)];%pad out of range data with nans, if orient X=-X
 if ~iscell(t);X(:,ist)=X;tt(ist)=tt;end%output times in same order as input
 
+else%Lagrange point
+  err=0;if isnumeric(t);tt=t;ist=1:numel(t);else;tt=t{1}:t{3}:t{2};end
+  X=Lagrange(n,tt);
+end
+
 if ~exist([params('bdir') 'ephem'],'dir');mkdir([params('bdir') 'ephem']);end%make "ephem" directory
 if params('save')&&nargin<3%save ephemeris data
 f=fopen(sprintf('%sephem/%d',params('bdir'),n),'w');
 d=[tt;X];if ~iscell(t);d=d(:,ist);end;d(:,isnan(X(1,:)))=[];%save times in order, don't save nans
 fwrite(f,size(d),'double');fwrite(f,d,'double');fclose(f);%write data, 1st two entries is data size
 if n>1e6;[n e]=getsb(n);putsbmb(n{1},{'ephref' 'ephdate'},{e now-730486.5});%always update small bodies
-else;putsbmb(n,{'ephref' 'ephdate'},{deblank(tephf.f(ieph,:)) now-730486.5});end%update reference file and time
+elseif n<1e3;putsbmb(n,{'ephref' 'ephdate'},{deblank(tephf.f(ieph,:)) now-730486.5});%update reference file and time
+else;putsbmb(n,{'ephref' 'ephdate'},[getref(floor(n/10)) now-730486.5]);end
 end%save
+return
+
+function X=Lagrange(b,t)
+i=mod(b,10);%Lagrange pt number
+b=floor(b/10);%central body
+m1=getgm(cbfun(b));m2=getgm(b);%masses
+
+if i<4%L1,L2,L3
+%calculate distance for circular (a), then scale by distance (r)
+m=m1+m2;m1=m1/m;m2=m2/m;%non-dim
+m1i=m1;m2i=m2;if i==1||i==3;m2i=-m2;end;if i==3;m1i=-m1i;end%account for direction of pull
+if i<3;L=exp(log(m2/m1/3)/3);if i==1;L=-L;end;elseif i==3;L=-2;end%initial guess
+L=L+1e-42i;%complex step
+for cc=1:99
+e=m1+L-m1i./(L+1).^2-m2i./L.^2;%balance dynamics, rotation - gravity
+de=imag(e)/1e-42;e=real(e);if all(abs(e)<9*eps);break;end
+%dL=e./de;ii=abs(dL)>xL;if any(ii);dL(ii)=sign(dL(ii))*xL;end
+L=L-e./de;
+end
+L=real(L);if any(abs(e)>9*eps);warning('Lagrange not converged');end
+%e=m1+L-m1i./(L+1).^2-m2i./L.^2;dL=-imag(e)/1e-42./de;L=L+dL*1e-42i;X=L*ephem1(b,t+1e-42i,1);X=[real(X);imag(X)/1e-42/86400];
+X=L*ephem1(b,t,3);%point is along position of secondary wrt primary
+
+else%L4,L5
+%triangular points
+X=ephem1(b,t+1e-42i,3);R=X(1:3,:);r=sqrt(sum(R.^2));V=X(4:6,:);H=cross(R,V);
+%y=exp(-log(sum(H.^2)./r/(m1+m2))*2/3);%adjust height of triangle?
+y=1;%equilateral
+Y=unit(cross(H,R));y=r.*sqrt(y-.25);%distance from axis connecting bodies
+if i==5;y=-y;end%L5 trails
+X=-R/2+Y.*[y;y;y];X=[real(X);imag(X)/1e-42/86400];%complex step
+end%i
+
 return
 
 function ed=getephdat(b)
@@ -821,9 +876,9 @@ elseif isempty(ed);%outer planets and satellites
     [ss,err]=curl(['ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/' ef '.txt']);
     %check default directory for similar filename
     if err;fils=char(regexp(curl('ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/'),'\S+(?=.txt)','match'));
-    ii=uniqstr(fils,ef);if isempty(ii);err=1;%could also check ftp://ssd.jpl.nasa.gov/pub/eph/satellites/rckin/rckin.*.log, but GM likely 0
-    else;[ss err]=curl(['ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/' deblank(fils(ii,:)) '.txt']);end
-    end
+        ii=uniqstr(fils,ef);if isempty(ii);fils=fils(end:-1:1,:);ii=uniqstr(fils,ef(1:3));end%look for first 3 letters of highest # file
+        if isempty(ii);err=1;else;[ss err]=curl(['ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/' deblank(fils(ii,:)) '.txt']);end
+    end;%could also check ftp://ssd.jpl.nasa.gov/pub/eph/satellites/rckin/rckin.*.log, but GM likely 0
     %ss is ephemeris header file 
     if ~err;
     %get GM from "Bodies on the File" table: skip space,keep 3 #s,skip some space, keep some #s, decimal, & non-space,skip space
@@ -841,18 +896,18 @@ return
 function tephf=getef
 %Ephemeris file and time spans used by Horizons
 tephf=params('tephf');if isempty(tephf)
-ss=curl('http://ssd.jpl.nasa.gov/eph_spans.cgi?id=A');%Planets
+ss=curl('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=A');%Planets
 %Read in bodynumber, begin time, " not " or " to " flag, end time, and file
 ss=regexp(ss,'<td.*?>(\d+)</td>.*?<\w\w?>(.*?) (not|to) (.*?)</\w\w?>&nbsp;.*?&nbsp;(.*?)&nbsp;','tokens');sss=cat(1,ss{:});
 %Mercury and Venus are Trouble (no ephemeris file, but still in table)
 for ii=find(strcmp(sss(:,3),'not'))';jj=find(strcmp(sss(:,1),[sss{ii,1} '99']));sss(ii,:)=sss(jj,:);sss{ii,1}=sss{jj,1}(1);end;sss(:,3)=[];
-ss=curl('http://ssd.jpl.nasa.gov/eph_spans.cgi?id=B');%Satellites
+ss=curl('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=B');%Satellites
 %Read in bodynumber, begin time, end time, and file (no need to flag " not " or " to "
 ss=regexp(ss,'<td.*?>(\d+)</td>.*?<tt>(.*?) to (.*?)</tt>&nbsp;.*?&nbsp;(.*?)&nbsp;','tokens');ss=cat(1,sss,ss{:});
 ss=regexprep(ss,{'B.C. \d{4}' 'A.D. '},{'0000' ''});%matlab doesn't do B.C., convert to days from J2000
 %ss=strrep(ss,'--','-Aug-');%fix error on website
 tephf.numbers=cellfun(@str2num,ss(:,1));tephf.f=char(ss(:,4));tephf.tl=[datenum(ss(:,2),'yyyy-mmm-dd') datenum(ss(:,3),'yyyy-mmm-dd')]-730486.5;
-ss=curl('http://ssd.jpl.nasa.gov/eph_spans.cgi?id=D');%Small body time spans (eph file read from getsb)
+ss=curl('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=D');%Small body time spans (eph file read from getsb)
 ss=regexp(ss,'&nbsp;(\S+) to (\S+)&nbsp;','tokens');tephf.sb(1:2)=datenum(ss{:},'yyyy-mmm-dd')-730486.5;
 params('tephf',tephf);end
 return
@@ -860,7 +915,7 @@ return
 function sd=getsatdat
 %Satellite data page, has GM and mean radius (& density, magnitude, albedo)
 sd=params('satdat');
-if isempty(sd);sd=curl('http://ssd.jpl.nasa.gov/?sat_phys_par');params('satdat',sd);end
+if isempty(sd);sd=curl('https://ssd.jpl.nasa.gov/?sat_phys_par');params('satdat',sd);end
 return
 
 function d=getpck(b,v)
@@ -890,19 +945,20 @@ return
 
 function x=getmb
 %major body list
-nn=curl('http://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB');
+nn=curl('https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB');
 nn=regexp(nn,'\n\s*(\d){1,3}\s+(.*?)\s\s','tokens');nn=cat(1,nn{:});%keep 1--3 numbers, skip spaces, keep stuff until two spaces
 nums=cellfun(@str2num,nn(:,1))';nams=nn(:,2);%numbers and names
 ii=nums>9;nums=[nums(ii) nums(~ii)];nams=[nams(ii);nams(~ii)];%match barycenters last
 x=getsbmb('mb');b=x.numbers;[ii jj]=ismember(nums,b);%see if body numbers already exist in data structure
 nums=[b nums(~ii)];n(jj(ii),1)=nams(ii);nams=[n;nams(~ii)];%put new bodies last
-x.numbers=nums;x.names=char(nams);params('mb',x);%save data
+x.numbers=nums;x.names=char(nams);params('mb',x);%params('mbmod',true);%save data
 return
 
 function [nnf eph s]=getsb(n)
 %small body web pages
 if ischar(n);srch=upper(urlencode(n));else;srch=num2str(n);end%name or number
-s=curl(['http://ssd.jpl.nasa.gov/sbdb.cgi?sstr=' srch]);
+s=curl(['https://ssd.jpl.nasa.gov/sbdb.cgi?sstr=' srch]);
+
 nam=regexp(s,'+1"><b>[^<]+','match');%Name is bigger font "+1"
 if ~isempty(nam);nam=nam{1}(8:end);
 num=regexp(s,'>\d{7}<','match');num=str2double(num{1}(2:end-1));
@@ -959,7 +1015,8 @@ if ischar(v{ii});if ~isfield(x,f{ii});x.(f{ii})='';end%character, initialize if 
 if numel(v{ii})<size(x.(f{ii}),2);v{ii}(size(x.(f{ii}),2))=' ';else;x.(f{ii})(bb,numel(v{ii}))=' ';end;x.(f{ii})(bb,:)=v{ii};
 else;if ~isfield(x,f{ii});x.(f{ii})=[];end%number, initialize if necessary
 %write, fill with nans
-nn=size(x.(f{ii}),2)+1;x.(f{ii})(:,bb)=v{ii};if bb>nn;x.(f{ii})(:,nn:bb-1)=nan;end;end
+nn=size(x.(f{ii}),2)+1;if isempty(x.(f{ii})); x.(f{ii})=v{ii};else;x.(f{ii})(:,bb)=v{ii};end; 
+if bb>nn;x.(f{ii})(:,nn:bb-1)=nan;end;end
 end%numel(f)
 params([bi 'mod'],true);params(bi,x);%save
 return
@@ -996,25 +1053,25 @@ end
 in=ceil(in/nxn);
 return
 
-function [d e]=curl(url,fout)
-%use curl, "urlread" is slow over vpn, maybe adjust proxy?
-%could also use wget -O- 
-%http://curl.haxx.se/dlwiz/?type=bin&os=Win32&flav=-&ver=-
-persistent cdir
-if isempty(cdir);%see if curl exists in boddat dir or on path
-cdir=params('bdir');
-if ~exist([cdir 'curl.exe'])&&~exist([cdir 'curl']);cdir=' ';[e d]=system('which curl');
-if e;if ispc;dn='nul';else;dn='/dev/null';end
-    [e d]=system([' curl -s "http://ssd.jpl.nasa.gov/sbdb.cgi?sstr=2142" > ' dn]);%run it & see what happens
-if e;error('curl is not a recognized system command from boddat.m\nTry copying a curl executable to %s',params('bdir'));
-end;end;end
-end%isempty cdir 
-%read the url, write to file and optionally read contents
-if nargin<2;fout=tempname;end
-if ispc;[e d]=system(['"', cdir, 'curl" "', url, '" > ', fout]);
-else;[e d]=system([cdir 'curl "' url '" > ' fout]);end
-if nargin<2;if ~e;f=fopen(fout);d=fscanf(f,'%c');fclose(f);end;delete(fout);end
+function cb=cbfun(b)
+if numel(b)==1;
+    cb=10;
+    if imag(b);cb=real(b);
+    elseif b>10&&b<1000&&mod(b,100)~=99;cb=floor(b/100)*100+99;
+    elseif b>1e3&&b<1e4;cb=floor(b/10);
+    end
+
+else
+    cb=repmat(10,size(b));
+    ii=b>10&b<1000&mod(real(b),100)~=99;cb(ii)=floor(b(ii)/100)*100+99;
+    ii=find(imag(b));cb(ii)=real(b(ii));
+    ii=b>1e3&b<1e4;cb(ii)=floor(b(ii)/10);
+end
 return
+
+
+function [d e]=curl(url);[d e]=urlread(url);e=~e;return
+
 
 function o=params(p,v)
 %variables global to function
