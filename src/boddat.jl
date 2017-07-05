@@ -586,8 +586,11 @@ for ib in 1:length(bs)
       end
   else
     n,_,_=getsb(b,dict)  #check ssd
-    (!isnan(n[1])) && (n=n[2])
-    (isnan(n[1])) && (n=[])
+    if !isnan(n[1])
+      n=n[2]
+    else
+      n=[]
+    end
   end
 
   if isempty(n)
@@ -595,25 +598,36 @@ for ib in 1:length(bs)
     warn("No match found for ",b)
   end#nomatch
   #format small body name, tokens in regexp are {number, name, (YYYY A1)}
-  if b>1e6;
-    n1=search(n,r" ")
-    n2 = n[n1[end]+1:end]
-    nT1 = n[1:n1[end]-1]
-    n1 = search(n2,"(")
-    if n1[1] == 1
-      nT2 = []
+  if b>1e6
+    n1 = search(n,"(")
+    if n1 != 0:-1
+      if n1[1] == 1
+        nT2 = []
+      else
+        nT2 = n[1:n1[end]-1]
+      end
+      nT3 = n[n1[end]:end]
     else
-      nT2 = n2[1:n1[end]-1]
+      nT2 = []
+      nT3 = []
     end
-    nT3 = n2[n1[end]:end]
+    n1=search(n,r" ")
+    if n1 != 0:-1
+      n2 = n[n1[end]+1:end]
+      nT1 = n[1:n1[end]-1]
+    else
+      nT1 = []
+    end
+    
+
     #n=n{1};#n=deblank(n{1});
     #if named, go with name, if numbered go with "# (provisional)",
     # otherwise output provisional designation
     if !isempty(nT2)
       n=nT2
-    elseif !isempty(nT1)
-      n=n
-    else
+    elseif isempty(nT3)
+      n=n2
+    elseif !isempty(nT3)
       n=nT3[2:end-1]
     end
   end
