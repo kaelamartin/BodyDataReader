@@ -1,4 +1,5 @@
-function boddat(bvars,bi::AbstractArray=[],dict::Dict=Dict(),t=[],opti=[])
+function boddat(bvars,bi::AbstractArray=[],dict::Dict=Dict(),t=[],
+                  opti::AbstractArray{Bool}=Bool[])
 # If have ssd flag, orient will not work and problems may occur elsewhere
 # qorient and orient not fully tested and might throw errors
 
@@ -174,7 +175,7 @@ end
 if size(t,2)>size(t,1)
   t = transpose(t)
 end
-(typeof(t[1])==Int64) && (t = t*1.)
+(eltype(t)==Int64) && (t = t*1.)
 
 #default options is [true false true], replace with any input and save in params
 opts=[true false true]
@@ -248,7 +249,7 @@ else
   nvars = length(bvars)
 end
 for bvr in 1:nvars
-  bvi = []
+  bvi = Int64[]
   bvar=bvars[bvr]
   (typeof(bvar)==Char) && (bvar = string(bvar))
   if length(bvar)==1
@@ -387,7 +388,7 @@ for bvr in 1:nvars
     elseif contains(fn,"Eqx")
       ll = 6
     else
-      ll = []
+      ll = Int64[]
     end
     (!contains(fn,"dcm")) && (ll = ll - 1) #check for dcm
     if fn[1]=='q' #check for quick calculation flag
@@ -439,6 +440,7 @@ if param(dict,"save")
     close(fid)
   end
 end
+(nvars == 1) && (varargout = varargout[1])
 return varargout
 end
 
@@ -1023,7 +1025,7 @@ return hx
 end
 
 function qorient(bb::AbstractArray{Int64},tt::AbstractArray{Float64},
-                                              typ::Bool,ll::Int64,dict::Dict)
+                    typ::Bool,ll::Int64,dict::Dict)
 #quick orientation calculation
 #ll=1: Pole
 #ll=2: [Node;Q;Pole] where Node=cross(Earth pole,Pole), Q=cross(Pole,Node)
@@ -2584,7 +2586,7 @@ elseif isempty(ed) #outer planets and satellites
     (isempty(jj)) && (ii = uniqstr(fils,ef))
     (isempty(ii))? (err = false) : (err = true)
     if isempty(ii) # Look for the first 3 leters of the highest # file
-      fils2 = Array{typeof(fils[1])}(size(fils))
+      fils2 = Array{eltype(fils)}(size(fils))
       nf = length(fils2)
       for kk in 1:nf
         fils2[kk] = fils[nf-kk+1]
@@ -2842,8 +2844,8 @@ if (!isempty(ii))&&(!param(dict,"ssd"))&&
   #see if entry exists in field for body
   if isempty(getfield(x,(Symbol(s))))
     o = []
-  elseif (typeof(getfield(x,Symbol(s))[1])==Float64)||
-          (typeof(getfield(x,Symbol(s))[1])==Int64)
+  elseif (eltype(getfield(x,Symbol(s)))==Float64)||
+          (eltype(getfield(x,Symbol(s)))==Int64)
     if length(getfield(x,Symbol(s)))>=ii
       if size(getfield(x,Symbol(s)),2) <= 1
         (!isnan(getfield(x,Symbol(s))[ii])) && (o=getfield(x,Symbol(s))[ii])
