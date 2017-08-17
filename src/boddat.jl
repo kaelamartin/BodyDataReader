@@ -65,7 +65,7 @@ function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
 #
 #"dict" or "dictionary" is an array that saves data for use later similar
 #   to Matlab's persistent variables. It can be passed in as an empty value
-#   "Dict()" or a filled dictionary. It will update after a call and overwrite.
+#   "Dict{String,Any}()" or a filled dictionary. It will update after a call and overwrite.
 #
 #"times" is days past noon 1/1/2000 (J2000) for ephemeris and orientation.
 #   times can be a numerical array or 3-element cell of {start time, end time,
@@ -91,7 +91,8 @@ function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
 #Example: Ephemeris +/- one week of Apophis close approach in 0.1-day increments
 #t = Dates.datetime2julian(DateTime(2029,04,13,22)) -
 #      Dates.datetime2julian(DateTime(2000,01,01,12)) + collect(-7:.1:7)
-# Pos,PM,St,n = boddat(["R","qpm","type","num"],["Apophis" "Earth"],Dict(),t)
+# Pos,PM,St,n =
+#      boddat(["R","qpm","type","num"],["Apophis" "Earth"],Dict{String,Any}(),t)
 
 #   (It can take up to a minute for Horizons to compute the ephemerides.)
 #   Pos = the position of the asteroid Apophis and Earth with respect to the sun
@@ -113,7 +114,7 @@ function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
 #   RV[1:3,:] = Pos[:,:,1]-Pos[:,:,2]
 #
 #Example (con'd): Bypassing saved data and using a step range for times
-#RV_h = boddat(["X"],[2099942; 399],Dict{String,Any}(),t[1]:.1:t[end],[false true])
+#RV_h = boddat(["X"],[2099942; 399],Dict{String,Any}(),t[1]:.1:t[end],[false; true])
 #
 #   RV_h = the state of Apophis with respect to Earth directly from Horizons.
 #   The zero in the options input indicates to not overwrite any saved data, and
@@ -284,15 +285,16 @@ for bvr in 1:nvars
     n = 6
     (bvi == 4) && (n = 12)
     (!typ) ? (tb = (length(t)==size(b,2))) : (tb = false)
-    if tb || size(b,2) == 1
-      Xeph = Array{eltype(t)}(n,length(t))
-    elseif !typ
-      Xeph = Array{eltype(t)}(n,length(t),size(b,2))
-    else
-      Xeph = Array{eltype(t)}(n,length(t[1]:t[3]:t[2]),size(b,2))
-    end
 
     if (!param(dict,"ssd"))||(!isdefined(:Xeph))
+      if tb || size(b,2) == 1
+        (!typ) ? (Xeph = Array{eltype(t)}(n,length(t))) :
+          (Xeph = Array{eltype(t)}(n,length(t[1]:t[3]:t[2])))
+      elseif !typ
+        Xeph = Array{eltype(t)}(n,length(t),size(b,2))
+      else
+        Xeph = Array{eltype(t)}(n,length(t[1]:t[3]:t[2]),size(b,2))
+      end
       ephem!(b,t,typ,bvi,dict,Xeph)
     end
     a=Xeph
@@ -304,8 +306,9 @@ for bvr in 1:nvars
   elseif bvi==5
     n = 6
     (!typ) ? (tb = (length(t)==size(b,2))) : (tb = false)
-    if tb
-      Xeph = Array{eltype(t)}(n,size(b,2))
+    if tb || size(b,2) == 1
+      (!typ) ? (Xeph = Array{eltype(t)}(n,length(t))) :
+        (Xeph = Array{eltype(t)}(n,length(t[1]:t[3]:t[2])))
     elseif !typ
       Xeph = Array{eltype(t)}(n,length(t),size(b,2))
     else
