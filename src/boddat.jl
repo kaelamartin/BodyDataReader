@@ -449,6 +449,12 @@ end
 return varargout
 end
 
+"""
+   boddatephem!(X,bi,dict,t)
+
+Quick ephemeris computation using input vector X for position, velocity, or
+acceleration for a body number and filled dictionary.
+"""
 function boddatephem!{P,Q}(X::AbstractArray{P},bi::AbstractArray{Q},
                 dict::Dict{String,Any},t::AbstractArray{P}=Float64[])
 # Faster boddat for ephemeris calls
