@@ -381,7 +381,7 @@ cada=cell(size(bs));
 %ssd=params('ssd');params('ssd',true)%for getnum
 for jj=1:numel(bs);b=bs(jj);if imag(b);cada{jj}='';continue;end
 if b<1e6;cada{jj}=[];continue;end%only for small bodies
-s=curl(sprintf('https://ssd.jpl.nasa.gov/sbdb.cgi?sstr=%d;cad=1',b));
+s=webread(sprintf('https://ssd.jpl.nasa.gov/sbdb.cgi?sstr=%d;cad=1',b));
 if jj/100==round(jj/100);fprintf('Close approach progress: %.0f%%\n',jj/numel(bs)*100);end
 ca=regexp(s,'<tr>  (.+?)</tr>','tokens');cad=[];
 for ii=1:numel(ca);
@@ -776,7 +776,8 @@ url=sprintf(['https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1'...horizons ur
 '&VEC_LABELS=''NO'''...
 '&CSV_FORMAT=''NO'''...
 '&OBJ_DATA=''NOPE'''],DES,n,CAP,coord,cb,llstr,tstr);
-ss=curl(url);i1=strfind(ss,'$$SOE')+6;i2=strfind(ss,'$$EOE')-1;%run horizons url command and extract goodies
+options = weboptions('Timeout',30);
+ss=webread(url,options);i1=strfind(ss,'$$SOE')+6;i2=strfind(ss,'$$EOE')-1;%run horizons url command and extract goodies
 if ~isempty(i1);X=[X sscanf(ss(i1:i2),'%f%*40c%e%e%e%e%e%e\n',[7 inf])];%successful run
 %tri=regexp(ss,'Center radii\s*: ([\d.]+) x ([\d.]+) x ([\d.]+) ','tokens');putsbmb(cb,{'tri'},{str2num(cat(1,tri{1}{:}))});%triaxial also in horizons
 else;err_str=ss,warning('Horizons error');X=nan*ones(6,numel(tt));return;end
@@ -825,7 +826,7 @@ X=L*ephem1(b,t,3);%point is along position of secondary wrt primary
 
 else%L4,L5
 %triangular points
-X=ephem1(b,t+1e-42i,3);R=X(1:3,:);r=sqrt(sum(R.^2));V=X(4:6,:);H=cross(R,V);
+X=ephem1(b,t+1e-42i,3);R=X(1:3,:);r=sqrt(r2);V=X(4:6,:);H=cross(R,V);
 %y=exp(-log(sum(H.^2)./r/(m1+m2))*2/3);%adjust height of triangle?
 y=1;%equilateral
 Y=unit(cross(H,R));y=r.*sqrt(y-.25);%distance from axis connecting bodies
@@ -844,10 +845,13 @@ if isempty(ed)&b<400;%inner planets and barycenters
     %read in DE### header data
     ef=char(regexp(ef,'de\d+','match'));%deXXX format
     efdir=['ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/' ef '/'];%directory
-    [d err]=curl([efdir 'header.' ef(3:end)]);%standard filename is "header.XXX"
-    if err;fils=regexp(curl(efdir),['header.' ef(3:end) '_?\d*'],'match');%sometimes in "header.XXX_YYY" format
+    try
+    d =urlread([efdir 'header.' ef(3:end)]);err=~err;%standard filename is "header.XXX"
+    err = 1;
+    catch
+    fils=regexp(webread(efdir),['header.' ef(3:end) '_?\d*'],'match');%sometimes in "header.XXX_YYY" format
     if isempty(fils);warning('ephemeris header file "%s" for %d not found',upper(ef),b);delete(hout);return
-    else;[d err]=curl([efdir fils{1}]);end
+    else;d=webread([efdir fils{1}]);end
     end
 
     ii=strfind(d,'GROUP   1040')+12;[nv,~,~,c]=sscanf(d(ii+[0:9]),'%d',1);   
@@ -873,13 +877,19 @@ if isempty(ed)&b<400;%inner planets and barycenters
     params(ef,ed);%save data
 elseif isempty(ed);%outer planets and satellites
     %check default directory and eph filename
-    [ss,err]=curl(['ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/' ef '.txt']);
+    [ss err] =urlread(['ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/' ef '.txt']);err = ~err;
+    
     %check default directory for similar filename
-    if err;fils=char(regexp(curl('ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/'),'\S+(?=.txt)','match'));
+    if err
+    fils=char(regexp(urlread('ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/'),'\S+(?=.txt)','match'));
         ii=uniqstr(fils,ef);if isempty(ii);fils=fils(end:-1:1,:);ii=uniqstr(fils,ef(1:3));end%look for first 3 letters of highest # file
-        if isempty(ii);err=1;else;[ss err]=curl(['ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/' deblank(fils(ii,:)) '.txt']);end
-    end;%could also check ftp://ssd.jpl.nasa.gov/pub/eph/satellites/rckin/rckin.*.log, but GM likely 0
+        if isempty(ii);err=1;
+        else; [ss err]=urlread(['ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/' deblank(fils(ii,:)) '.txt']);
+                err = ~err;
+        end
+    %could also check ftp://ssd.jpl.nasa.gov/pub/eph/satellites/rckin/rckin.*.log, but GM likely 0
     %ss is ephemeris header file 
+    end
     if ~err;
     %get GM from "Bodies on the File" table: skip space,keep 3 #s,skip some space, keep some #s, decimal, & non-space,skip space
     gm=regexp(ss,'\s(\d{3})\s+((\d+\.\S*))\s','tokens');gm=cat(1,gm{:});
@@ -890,24 +900,25 @@ elseif isempty(ed);%outer planets and satellites
     %end%if
     else;warning('ephemeris header file "%s" for %d not found',upper(ef),b);end%err
     params(ef,ed);
+
 end
 return
 
 function tephf=getef
 %Ephemeris file and time spans used by Horizons
 tephf=params('tephf');if isempty(tephf)
-ss=curl('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=A');%Planets
-%Read in bodynumber, begin time, " not " or " to " flag, end time, and file
+ss=webread('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=A');%Planets
+%Read in bodynumber, begin time, "not" or "to" flag, end time, and file
 ss=regexp(ss,'<td.*?>(\d+)</td>.*?<\w\w?>(.*?) (not|to) (.*?)</\w\w?>&nbsp;.*?&nbsp;(.*?)&nbsp;','tokens');sss=cat(1,ss{:});
 %Mercury and Venus are Trouble (no ephemeris file, but still in table)
 for ii=find(strcmp(sss(:,3),'not'))';jj=find(strcmp(sss(:,1),[sss{ii,1} '99']));sss(ii,:)=sss(jj,:);sss{ii,1}=sss{jj,1}(1);end;sss(:,3)=[];
-ss=curl('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=B');%Satellites
+ss=webread('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=B');%Satellites
 %Read in bodynumber, begin time, end time, and file (no need to flag " not " or " to "
 ss=regexp(ss,'<td.*?>(\d+)</td>.*?<tt>(.*?) to (.*?)</tt>&nbsp;.*?&nbsp;(.*?)&nbsp;','tokens');ss=cat(1,sss,ss{:});
 ss=regexprep(ss,{'B.C. \d{4}' 'A.D. '},{'0000' ''});%matlab doesn't do B.C., convert to days from J2000
 %ss=strrep(ss,'--','-Aug-');%fix error on website
 tephf.numbers=cellfun(@str2num,ss(:,1));tephf.f=char(ss(:,4));tephf.tl=[datenum(ss(:,2),'yyyy-mmm-dd') datenum(ss(:,3),'yyyy-mmm-dd')]-730486.5;
-ss=curl('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=D');%Small body time spans (eph file read from getsb)
+ss=webread('https://ssd.jpl.nasa.gov/eph_spans.cgi?id=D');%Small body time spans (eph file read from getsb)
 ss=regexp(ss,'&nbsp;(\S+) to (\S+)&nbsp;','tokens');tephf.sb(1:2)=datenum(ss{:},'yyyy-mmm-dd')-730486.5;
 params('tephf',tephf);end
 return
@@ -915,14 +926,14 @@ return
 function sd=getsatdat
 %Satellite data page, has GM and mean radius (& density, magnitude, albedo)
 sd=params('satdat');
-if isempty(sd);sd=curl('https://ssd.jpl.nasa.gov/?sat_phys_par');params('satdat',sd);end
+if isempty(sd);sd=webread('https://ssd.jpl.nasa.gov/?sat_phys_par');params('satdat',sd);end
 return
 
 function d=getpck(b,v)
 %NAIF pck file, analytic orientation & contains some small body radii and orientation data not on Horizons
 pck=params('pck');if isempty(pck)
-pck=regexp(curl('ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/'),'pck\d+.tpc','match');%get latest file in directory
-pck=curl(['ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/' pck{end}]);%read contents to string
+pck=regexp(urlread('ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/'),'pck\d+.tpc','match');%get latest file in directory
+pck=urlread(['ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/' pck{end}]);%read contents to string
 pck=strrep(strrep(strrep(pck,sprintf('\n'),';'),'(','['),')',']');%turn newlines into ; and parens into brackets for matlabese
 pck=strrep(strrep(pck,'2431010','2000243'),'9511010','2000951');%change # of Ida and Gaspra to SPK-ID
 params('pck',pck);end%save
@@ -945,7 +956,7 @@ return
 
 function x=getmb
 %major body list
-nn=curl('https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB');
+nn=webread('https://ssd.jpl.nasa.gov/horizons_batch.cgi?batch=1&COMMAND=MB');
 nn=regexp(nn,'\n\s*(\d){1,3}\s+(.*?)\s\s','tokens');nn=cat(1,nn{:});%keep 1--3 numbers, skip spaces, keep stuff until two spaces
 nums=cellfun(@str2num,nn(:,1))';nams=nn(:,2);%numbers and names
 ii=nums>9;nums=[nums(ii) nums(~ii)];nams=[nams(ii);nams(~ii)];%match barycenters last
@@ -957,8 +968,7 @@ return
 function [nnf eph s]=getsb(n)
 %small body web pages
 if ischar(n);srch=upper(urlencode(n));else;srch=num2str(n);end%name or number
-s=curl(['https://ssd.jpl.nasa.gov/sbdb.cgi?sstr=' srch]);
-
+s=webread(['https://ssd.jpl.nasa.gov/sbdb.cgi?sstr=' srch]);
 nam=regexp(s,'+1"><b>[^<]+','match');%Name is bigger font "+1"
 if ~isempty(nam);nam=nam{1}(8:end);
 num=regexp(s,'>\d{7}<','match');num=str2double(num{1}(2:end-1));
@@ -1015,8 +1025,7 @@ if ischar(v{ii});if ~isfield(x,f{ii});x.(f{ii})='';end%character, initialize if 
 if numel(v{ii})<size(x.(f{ii}),2);v{ii}(size(x.(f{ii}),2))=' ';else;x.(f{ii})(bb,numel(v{ii}))=' ';end;x.(f{ii})(bb,:)=v{ii};
 else;if ~isfield(x,f{ii});x.(f{ii})=[];end%number, initialize if necessary
 %write, fill with nans
-nn=size(x.(f{ii}),2)+1;if isempty(x.(f{ii})); x.(f{ii})=v{ii};else;x.(f{ii})(:,bb)=v{ii};end; 
-if bb>nn;x.(f{ii})(:,nn:bb-1)=nan;end;end
+nn=size(x.(f{ii}),2)+1;x.(f{ii})(:,bb)=v{ii};if bb>nn;x.(f{ii})(:,nn:bb-1)=nan;end;end
 end%numel(f)
 params([bi 'mod'],true);params(bi,x);%save
 return
@@ -1070,12 +1079,14 @@ end
 return
 
 
-function [d e]=curl(url);[d]=webread(url);e=0;return
-
-
 function o=params(p,v)
 %variables global to function
 %make p persistent and write v to p, then retrieve p from any function via o 
 persistent vs
 if nargin==2;vs.(p)=v;elseif isfield(vs,p);o=vs.(p);else;o=[];end
+return
+
+function X=unit(x)
+%creates unit vector
+X=x/sqrt(dot(x,x));
 return
