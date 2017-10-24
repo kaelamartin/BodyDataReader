@@ -236,6 +236,7 @@ function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
             b[ii] = convert(Complex{Int64},be[ii])
         end
     end
+
     #for each parameter input call the appropriate funciton and write
     #result to varargout
     nvars = length(bvars)
@@ -687,8 +688,8 @@ Outputs the associated number of the specified body input.
                                                                 n=getx(b1,"numbers",dict) #check saved data (& no ssd flag)
                                                                 if !isempty(n)#found it
                                                                                 n = n[1]
-                                                                elseif b[1]>1e3 && b[1]<1e4 && mod(b[1],10)<6
-                                                                                n=b; #Lagrange point
+                                                                elseif b1>1e3 && b1<1e4 && mod(b1,10)<6
+                                                                                n=b1 #Lagrange point
                                                                 elseif b1<1e6
                                                                                 x=getmb(dict)
                                                                                 n=findfirst(y->(y==b1),x.numbers) #check list of major bodies
@@ -3517,7 +3518,7 @@ function uniqsb(b,dict::Dict{String,Any})
                 for b1 in bs
                                 nn,_,_ = getsb(b1,dict) #check ssd
                                 println(nn)
-                                if isnan(nn[1]) && !isempty(nn[2])
+                                if (nn==NaN) && !isempty(nn)
                                                 warn(b1,"returned multiple matches. not coded for multiple matches")
                                                 #n is {number name provisional} of firt match, keep first of those
                                                 #n=regexp(nn{2}(1,:),'(\d*\s?)([^\(]*)(.*)','tokens');
