@@ -1070,7 +1070,7 @@ end
 return
 
 
-function [d e]=curl(url);[d e]=urlread(url);e=~e;return
+function [d e]=curl(url);[d]=webread(url);e=0;return
 
 
 function o=params(p,v)
