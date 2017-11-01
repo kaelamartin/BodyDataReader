@@ -384,7 +384,8 @@ for bvr in 1:nvars
     elseif bvi==8
       a = Array{String}(length(b))
       for ii in 1:length(b)
-        a[ii]=getnam(b[ii],dict) #name, works for NonBodyControlPoints
+        T2 = getnam(b[ii],dict)
+        a[ii]=T2[1] #name, works for NonBodyControlPoints
       end
       #9--19 calls a function called getfn, which uses matching bva parameter to
       #      use the corresponding function  elseif bvi<20
@@ -728,13 +729,12 @@ n=getx(b,"Names",dict) #check saved data (& no ssd flag)
 if !isempty(n)#found it
 elseif b>1e3&&b<1e4&&mod(b,10)<6
     L = mod(b,10) #Lagrange point
-    b = floor(b/10)
-    n = []
-    n =[cbfun(b) b]
-    n = getnam(n)
-    n = sprintf("%s-%s L%d", n[:], L)
-    putsbmb(10*b+L, "names", n)
-    putsbmb(10*b+L, "numbers", 10*b+L)
+    b = floor(Int,b/10)
+    T1 = getnam(cbfun(b),dict)
+    T2 = getnam(b,dict)
+    n = [T1[1]*"-"*T2[1]*" "*string(L)]
+    putsbmb(10*b+L, "Names", n, dict)
+    putsbmb(10*b+L, "numbers", 10*b+L, dict)
 elseif b<1e6
     x=getmb(dict)
     n=find(y->(y==b),x.numbers)#check list of major bodies
