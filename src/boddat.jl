@@ -2170,7 +2170,7 @@ for ibu in 1:length(bb) #match times for each unique body
   #cl2 is Pole|PM|eqx output, ii is cl2 data exists, ij is any data exists
   cl2=ceil(Int,ll/2)
   iN=find(x->(x==bib),id)
-  if !isempty(iN) # possibly coded wrong since not sure what id is like
+  if !isempty(iN)
     T1 = size(id)
     jj = zeros(Int,length(iN)); ij = Int[]
     for kk in 1:length(iN)
@@ -2329,7 +2329,7 @@ for ibu in 1:length(bb) #match times for each unique body
 
       #see if body already exists in idori
       (!haskey(d,ii)) && (d[ii] = Dict())
-      d[ii][cl2] = Dict()
+      d[ii][cl2] = Dict{String,Array{Float64}}()
       spline!(di[1,:],di[2:end,:],d[ii][cl2])
       if param(dict,"keeps")
         param(dict,"idori",id)
@@ -2366,7 +2366,7 @@ for ibu in 1:length(bb) #match times for each unique body
       end
       if any(ist) #ist is indeces of data outside of spline range
         ts=t[ist]
-        t[ist]=[]
+        deleteat!(t,ist)
       end
       if (iszero(id[ii,1]))
         P,_=orient([bib],t,typ,1,dict)
@@ -2436,9 +2436,11 @@ for ibu in 1:length(bb) #match times for each unique body
 
   if any(ist) #get horizons data for out of range times
     sav=param(dict,"save")
-    param(dict,"save",false); param(dict,"ssd",1);#reset flags
-    Xs=orient([bib],ts,false,ll,dict)
-    X[:,.!(ist)]=X
+    param(dict,"save",false); param(dict,"ssd",true)#reset flags
+    Xs,_=orient([bib],ts,false,ll,dict)
+    XT = copy(X)
+    X = Array{eltype(X)}(size(X,1),length(ist))
+    X[:,.!(ist)]=XT
     X[:,ist]=Xs
     param(dict,"save",sav)
     param(dict,"ssd",ssd)
