@@ -323,7 +323,6 @@ for bvr in 1:nvars
       Xeph = Array{eltype(t)}(n,length(t[1]:t[3]:t[2]),size(b,2))
     end
     ephem!(b,t,typ,3,dict,Xeph)
-    Xeph=ephem(b,t,typ,3,dict)
     R=Xeph[1:3,:,:]
     V=Xeph[4:6,:,:]
     uH = zeros(R)
