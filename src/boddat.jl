@@ -12,9 +12,9 @@ function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
 
 ## Function needs following Julia packages: HDF5, JLD, URIParser
 # Note: Install HDF5 before JLD
-# Add packages by: Pkg.add("HDF5"); Pkg.add("JLD"); Pkg.add("URIParser")
+# Add packages by: Pkg.add("HDF5"); Pkg.add("JLD")
 # At start of file using boddat put:
-#          using JLD,HDF5,URIParser
+#          using JLD,HDF5
 #           include("path/boddat.jld")
 -# bi should nominally be a row vector. [399; 499] will reslt in Earth's position
 #     relative to Mars
@@ -1424,7 +1424,7 @@ Creates the position vector and gets the ephemeris data for the corresponding
 body then calls ephem1.
 """
 function ephem!{T,P}(b::AbstractArray{T},t::AbstractArray{P},
-                typ::Bool,bvi::Int64,dict::Dict{String,Any},
+                typ::Bool,bvi::Int,dict::Dict{String,Any},
                 X::AbstractArray{P})
 #ephemeris
 # typ is if t is a linspace (true) or if t is vector (false)
@@ -1587,8 +1587,8 @@ input, a non-control point, and creates a mkph save file if data is not saved.
 
 If bib is complex, outputs zeros for X.
 """
-function ephem1(bib::Complex{Int64},t::AbstractArray{Float64},typ::Bool,
-bvi::Int64,dict::Dict{String,Any})
+function ephem1(bib::Complex{Int},t::AbstractArray{Float64},typ::Bool,
+bvi::Int,dict::Dict{String,Any})
 n=6
 if bvi==4
   n=12
@@ -1602,7 +1602,7 @@ return X,t
 end
 
 function ephem1{P}(bib::Int64,t::AbstractArray{P},typ::Bool,
-bvi::Int64,dict::Dict{String,Any})
+bvi::Int,dict::Dict{String,Any})
 n=6
 if bvi==4
   n=12
@@ -3394,7 +3394,7 @@ Retrieves small body list from Horizons.
 function getsb(n,dict::Dict{String,Any})
 #small body web pages
 if typeof(n) == String #name or number
-  srch = escape(n)
+  srch = escape_string(n)
 else
   srch=string(convert(Int64,n))
 end
@@ -3680,7 +3680,7 @@ Looks for a unique match for a body input.
 Example: if there are 5 asteroids that look for 'ces', it looks for a unique string
 after this to differentiate between them.
 """
-function uniqstr(xni,bi,nb::Int64=0)
+function uniqstr(xni,bi,nb::Int=0)
 #find a unique match of bi in xni
 #1 for only whole word matches, 2 for only fragment matches, 0 for either
 if typeof(xni) == String
@@ -3874,7 +3874,7 @@ Evaluates a polynomial by getting the coefficients from the spline and evaluatin
 the polynomial over many steps. v has to be a zero input.
 """
 function pval!{T}(pp::Dict{String,Array{Float64}},xx::AbstractArray{T},
-                order::Int64,v::AbstractArray{T})
+                order::Int,v::AbstractArray{T})
 # Assumes that xx is sorted from smallest to largest
 # pp is dictionary
 # xx is a 1 x n or n x 1
