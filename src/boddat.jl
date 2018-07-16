@@ -145,7 +145,7 @@ function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
 varargout = Array{Any}(length(bvars))
 
 if isempty(dict)
-    sb = SB([],[],[],[],[],[],[],[],[],[],[])
+    sb = SB([],[],[],[],[],[],[],[],[],[],[],[])
     mb = MB([],[],[],[],[],[],[],[],[],[])
     tephf = TEPHF([],[],[],[])
     dict["sb"] = sb
@@ -431,7 +431,7 @@ if param(dict,"save")
         fid = jldopen(fn,"w") # Must use HDF5 and JLD package
         boddict = Dict()
         boddict["mb"] = MB([],[],[],[],[],[],[],[],[],[])
-        boddict["sb"] = SB([],[],[],[],[],[],[],[],[],[],[])
+        boddict["sb"] = SB([],[],[],[],[],[],[],[],[],[],[],[])
         fid["boddict"] = boddict
         close(fid)
     end
@@ -1209,11 +1209,7 @@ for jj=1:length(bs)
         hx[jj]=""
         continue
     end
-    if b>1e6
-        h=getx(b,"ephref",dict)#check saved data (& no ssd flag)
-    else
-        h = ""
-    end
+    h=getx(b,"ephref",dict)#check saved data (& no ssd flag)
     if (isempty(h)) && (param(dict,"ssd")) #see what current file is
         if b<1e6
             tephf=getef(dict)
@@ -3291,7 +3287,7 @@ if (!isempty(ii))&&(!param(dict,"ssd"))&&
                 end
             end
         end
-    elseif typeof(getfield(x,Symbol(s)))==Array{AbstractString,1}
+    elseif eltype(getfield(x,Symbol(s)))==String
         if length(getfield(x,Symbol(s)))>=ii
             (!isempty(getfield(x,Symbol(s))[ii])) && (o = getfield(x,Symbol(s))[ii])
         end
@@ -3942,6 +3938,7 @@ type SB
     ephref::AbstractArray{String}
     ephdate::AbstractArray{Float64}
     pp::AbstractArray{Float64}
+    tri::AbstractArray{Float64}
 end
 
 type TEPHF
