@@ -3,10 +3,10 @@ varargout = boddat(bvars, bi, dict, t, opti)
 
 Main function that takes inputs and gives desired output.
 """
-function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
+function boddat(bvars::AbstractArray{String},bi::AbstractArray=[],
     dict::Dict{String,Any}=Dict{String,Any}(),
     t::AbstractArray{P}=Float64[],
-    opti::AbstractArray{Bool}=Bool[])
+    opti::AbstractArray{Bool}=Bool[]) where P
 # If have ssd flag, orient will not work and problems may occur elsewhere
 # qorient and orient not fully tested and might throw errors
 
@@ -142,7 +142,7 @@ function boddat{P}(bvars::AbstractArray{String},bi::AbstractArray=[],
 #Satellite GM and mean radius https://ssd.jpl.nasa.gov/?sat_phys_par
 #analytic orientation and radii
 #       ftp://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/
-varargout = Array{Any}(length(bvars))
+varargout = Array{Any}(undef, length(bvars))
 
 if isempty(dict)
     sb = SB([],[],[],[],[],[],[],[],[],[],[],[])
@@ -213,7 +213,7 @@ param(dict,"sbmod",false)
 
 #get body numbers as unique identifiers, ephemeris (be) can be 2 x n,
 # otherwise first row of b is used
-ii = find(x->(typeof(x)==SubString{String}),bi)
+ii = findall(x->(typeof(x)==SubString{String}),bi)
 for jj in ii
     bi[jj] = bi[jj]*""
 end
@@ -246,30 +246,30 @@ for bvr in 1:nvars
     bvar=bvars[bvr]
 
     if length(bvar)==1
-        inBVA = find(x->(contains(x,bvar)),param(dict,"bva")[1:4])
+        inBVA = findall(x->(occursin(x,bvar)),param(dict,"bva")[1:4])
     else
-        inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+        inBVA = findall(x->(occursin(x,bvar)),param(dict,"bva"))
     end
         (!isempty(inBVA)) && (inBVA = inBVA[1])
     #find out which member of bva matches input
     if isempty(inBVA)
         bvar = uppercase(bvar)
-        inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+        inBVA = findall(x->(occursin(x,bvar)),param(dict,"bva"))
         (!isempty(inBVA)) && (inBVA = inBVA[1])
         if isempty(inBVA)
             bvar = lowercase(bvar)
-            inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+            inBVA = findall(x->(occursin(x,bvar)),param(dict,"bva"))
             (!isempty(inBVA)) && (inBVA = inBVA[1])
             if isempty(inBVA)
                 bvar = ucfirst(bvar)
-                inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+                inBVA = findall(x->(occursin(x,bvar)),param(dict,"bva"))
                 (!isempty(inBVA)) && (inBVA = inBVA[1])
                 if isempty(inBVA)
                     bvar = lcfirst(bvar)
                     bvar = replace(bvar,"pm","PM")
                     bvar = replace(bvar,"pole","Pole")
                     bvar = replace(bvar,"eq","Eq")
-                    inBVA = find(x->(contains(x,bvar)),param(dict,"bva"))
+                    inBVA = findall(x->(occursin(x,bvar)),param(dict,"bva"))
                     (!isempty(inBVA)) && (inBVA = inBVA[1])
                 end
             end
@@ -295,7 +295,7 @@ for bvr in 1:nvars
 
         if (!param(dict,"ssd"))||(!isdefined(:Xeph))
             if tb || size(b,2) == 1
-                (!typ) ? (Xeph = Array{eltype(t)}(n,length(t))) :
+                (!typ) ? (Xeph = Array{eltype(t)}(undef, n,length(t))) :
                 (Xeph = Array{eltype(t)}(n,length(t[1]:t[3]:t[2])))
             elseif !typ
                 Xeph = Array{eltype(t)}(n,length(t),size(b,2))
@@ -365,7 +365,7 @@ for bvr in 1:nvars
                 T1[ii]=false
             end
         end
-        jj = find(x->(x),T1)
+        jj = findall(x->(x),T1)
         if isempty(jj)
             a = cb
         else
@@ -407,14 +407,14 @@ for bvr in 1:nvars
     else
         fn=param(dict,"bva")
         fn=fn[bvi]
-        if contains(fn,"Pole")
+        if occursin(fn,"Pole")
             ll = 2
-        elseif contains(fn,"PM")
+        elseif occursin(fn,"PM")
             ll = 4
-        elseif contains(fn,"Eqx")
+        elseif occursin(fn,"Eqx")
             ll = 6
         end
-        (!contains(fn,"dcm")) && (ll = ll - 1) #check for dcm
+        (!occursin(fn,"dcm")) && (ll = ll - 1) #check for dcm
         if fn[1]=='q' #check for quick calculation flag
             a=qorient(b,t,typ,ll,dict)
         else
@@ -425,7 +425,7 @@ for bvr in 1:nvars
 end
 #save data to bodydata
 if param(dict,"save")
-    @static is_windows()? (fn= string(param(dict,"bdir"),"\\bodydata.jld")):(fn=
+    @static Sys.iswindows() ? (fn = string(param(dict,"bdir"), "\\bodydata.jld")) : (fn=
     string(param(dict,"bdir"),"/bodydata.jld"))
     if !isfile(fn)
         fid = jldopen(fn,"w") # Must use HDF5 and JLD package
@@ -473,8 +473,8 @@ boddatephem!(X,bi,dict,t)
 Quick ephemeris computation using input vector X for position, velocity, or
 acceleration for a body number and filled dictionary.
                 """
-function boddatephem!{P,Q}(X::AbstractArray{P},bi::AbstractArray{Q},
-                dict::Dict{String,Any},t::AbstractArray{P}=Float64[])
+function boddatephem!(X::AbstractArray{P},bi::AbstractArray{Q},
+                dict::Dict{String,Any},t::AbstractArray{P}=Float64[]) where {P, Q}
 # Faster boddat for ephemeris calls
 if typeof(t)==StepRangeLen{Float64,Base.TwicePrecision{Float64},
     Base.TwicePrecision{Float64}} || typeof(t)==StepRange{Int64,Int64}
@@ -511,8 +511,8 @@ ephem!(b,t,typ,bvi,dict,X)
 
 end
 
-function boddatephem!{P}(X::AbstractArray{P},bi::AbstractArray{Int64},
-                dict::Dict{String,Any},t::AbstractArray{P}=Float64[])
+function boddatephem!(X::AbstractArray{P},bi::AbstractArray{Int64},
+                dict::Dict{String,Any},t::AbstractArray{P}=Float64[]) where P
 # Faster boddat for ephemeris calls
 if typeof(t)==StepRangeLen{Float64,Base.TwicePrecision{Float64},
     Base.TwicePrecision{Float64}} || typeof(t)==StepRange{Int64,Int64}
@@ -541,18 +541,18 @@ b = getnum(bi, dict)
 Returns the SPK number of inputted body. If input 'bi' is not numerical
 it will turn into a string.
 """
+function getnum(bi::AbstractArray{P},dict::Dict{String,Any}) where P
 
-function getnum{P}(bi::AbstractArray{P},dict::Dict{String,Any})
-#get body number, only called if bi isn't numerical
 (typeof(param(dict,"mb"))!=MB) && (param(dict,"mb",MB([],[],[],[],[],[],[],[],[],[])))
+#get body number, only called if bi isn't numerical
 mb = param(dict,"mb")
 
 #change into string, bi is used in central body output
 
-if any(x->contains(x,"_CP"),bi[find(x->typeof(x)==String,bi)])
+if any(x->occursin(x,"_CP"),bi[findall(x->typeof(x)==String,bi)])
     b = Array{Union{Complex{Int},Int}}(size(bi))
 else
-    b = Array{Int64}(size(bi))
+    b = Array{Int64}(undef, size(bi))
 end
 
 for ib in 1:length(bi)
@@ -562,7 +562,7 @@ for ib in 1:length(bi)
     else
         bib = bi[ib]
     end
-    if contains(bi[ib],"_CP")
+    if occursin(bi[ib],"_CP")
         nbcp = true
         bib = replace(bib,"_CP","")
     else
@@ -641,7 +641,7 @@ for ib in 1:length(bi)
                         end#mb potentially skipped
                     end#sb any
                     if !isempty(In)
-                        println("> Found it! ",bib," set to "x.Names[In,:])
+                        println("> Found it! ",bib," set to "*x.Names[In,:])
                     end
                 end#sb word
             end#mb any
@@ -667,7 +667,7 @@ bo = getnumout(bi, dict)
 
 Outputs the associated number of the specified body input.
 """
-function getnumout{T}(bi::AbstractArray{T},dict::Dict{String,Any})
+function getnumout(bi::AbstractArray{T},dict::Dict{String,Any}) where T
 
 if iszero(imag(bi))
     bo = zeros(Int64,size(bi))
@@ -739,7 +739,7 @@ elseif b>1e3&&b<1e4&&mod(b,10)<6
     putsbmb(10*b+L, "numbers", 10*b+L, dict)
 elseif b<1e6
     x=getmb(dict)
-    n=find(y->(y==b),x.numbers)#check list of major bodies
+    n=findall(y->(y==b),x.numbers)#check list of major bodies
     if !isempty(n)
         n=x.Names[n]
     end
@@ -795,7 +795,7 @@ gmx = getgm(bs, dict)
 Finds the inputted body's gravitational constant. Unless it is zero, it will estimate
 based on density and size of body
 """
-function getgm{T}(bs::AbstractArray{T},dict::Dict{String,Any})
+function getgm(bs::AbstractArray{T},dict::Dict{String,Any}) where T
 # GM from ephemeris header constants unless = 0, then estimate from
 #   density and size
 gmx=zeros(length(bs))
@@ -881,7 +881,7 @@ rx = getrad(bs, dict)
 
 Gets radius for inputted body or finds body with associated radius.
 """
-function getrad{T}(bs::AbstractArray{T},dict::Dict{String,Any})
+function getrad(bs::AbstractArray{T},dict::Dict{String,Any}) where T
 rx=zeros(Float64,length(bs))
 for jj in 1:length(bs)
     b=bs[jj]
@@ -1132,8 +1132,8 @@ for jj=1:length(bs)
     cls =[]
     clt = []
     for ii in 1:length(rd)
-        (contains(rd[ii],"Close-Approach Data")) && (cls = [cls; ii])
-        (contains(rd[ii],"<b>Close-Approach Data")) && (clt = [clt;ii])
+        (occursin(rd[ii],"Close-Approach Data")) && (cls = [cls; ii])
+        (occursin(rd[ii],"<b>Close-Approach Data")) && (clt = [clt;ii])
     end
     if isempty(cls)
         warn("no close approach data for body ",b)
@@ -1142,12 +1142,12 @@ for jj=1:length(bs)
     end
     (length(clt)>1) && (warn("close-approach data might not be correct"))
     clt = clt[1]
-    ii = find(x->(x==clt),cls)
+    ii = findall(x->(x==clt),cls)
     tst = cls[ii[1]]
     ten = cls[ii[1]+1]
     lne = []
     for ii in tst:ten
-        (contains(rd[ii],"</tr>")) && (lne = [lne; ii])
+        (occursin(rd[ii],"</tr>")) && (lne = [lne; ii])
     end
     cad = zeros(length(lne)-3,3)
     LastNum = ""
@@ -1213,7 +1213,7 @@ for jj=1:length(bs)
     if (isempty(h)) && (param(dict,"ssd")) #see what current file is
         if b<1e6
             tephf=getef(dict)
-            ii = find(x->(x==string(b)),tephf.numbers)
+            ii = findall(x->(x==string(b)),tephf.numbers)
             h=tephf.f[ii[1]] #get ephemeris from list
         else
             h,e_=getsb(b,dict)
@@ -1327,7 +1327,7 @@ for ibu in 1:length(bb)
         end
     end
     b=bb[ibu]
-    tb? (t=tt[ibu]) : (t=tt)
+    tb ? (t=tt[ibu]) : (t=tt)
 
     pp=getx(b,"pp",dict)
     if isempty(pp)#check saved data (& no ssd flag)
@@ -1406,7 +1406,7 @@ for ibu in 1:length(bb)
             X[:,ii] = [T1[:,ii];cross(P[:,ii],T1[:,ii]);P[:,ii]]
         end
     end
-    (cl2!=2) && (X=repmat(X,size(t,2),size(t,1))) #match size of t
+    (cl2!=2) && (X=repeat(X,size(t,2),size(t,1))) #match size of t
 
     if tb
         xx[:,ibu]=X
@@ -1422,9 +1422,9 @@ ephem!(b, t, typ, bvi, dict, X)
 Creates the position vector and gets the ephemeris data for the corresponding
 body then calls ephem1.
 """
-function ephem!{T,P}(b::AbstractArray{T},t::AbstractArray{P},
+function ephem!(b::AbstractArray{T},t::AbstractArray{P},
                 typ::Bool,bvi::Int64,dict::Dict{String,Any},
-                X::AbstractArray{P})
+                X::AbstractArray{P}) where {T, P}
 #ephemeris
 # typ is if t is a linspace (true) or if t is vector (false)
 sb=size(b)
@@ -1600,8 +1600,8 @@ X=zeros(n,length(t))
 return X,t
 end
 
-function ephem1{P}(bib::Int64,t::AbstractArray{P},typ::Bool,
-bvi::Int64,dict::Dict{String,Any})
+function ephem1(bib::Int64,t::AbstractArray{P},typ::Bool,
+bvi::Int64,dict::Dict{String,Any}) where P
 n=6
 if bvi==4
     n=12
@@ -1632,17 +1632,17 @@ cb = cbfun(bib) #central body, treat planets and satellites differently
 #else
 # cb=10
 #end#central body, treat planets and satellites differently
-ii=find(x->(x==bib),id)#see if saved data exists
+ii=findall(x->(x==bib),id)#see if saved data exists
 if isempty(ii)
-    @static is_windows()?
-    (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)".jld") :
+    @static Sys.iswindows() ?
+    (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)*".jld") :
     (efile = param(dict,"bdir")*"/ephem/"*string(bib)*".jld")
     if (!isfile(efile)) && (bib>1e6)
         bib,_=getsb(bib,dict)
         bib=bib[1]
-        @static is_windows()?
-        (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)".jld") :
-        (efile = param(dict,"bdir")*"/ephem/"*string(bib)".jld")
+        @static Sys.iswindows() ?
+        (efile = param(dict,"bdir")*"\\ephem\\"*string(bib)*".jld") :
+        (efile = param(dict,"bdir")*"/ephem/"*string(bib)*".jld")
         #see if number changed
     end
     if !isfile(efile) #te is saved time span, di is data to save, don't save nans
@@ -1691,7 +1691,7 @@ if isempty(ii)
         for ii in 1:length(dqr)
             T1[ii] = abs(dqr[ii])>pi
         end
-        jj = find(T1)
+        jj = findall(T1)
         for ii in 1:length(jj)
             if (ii == length(jj))
                 qr1[jj[ii]+1:end] = qr1[jj[ii]+1:end] + ii*2*pi
@@ -1749,7 +1749,7 @@ ist=falses(length(t))
 #see if data is out of bounds
 tl=d[ii]["breaks"][1]
 if minimum(real(t))<tl
-    kk = find(x->(x<tl),t)
+    kk = findall(x->(x<tl),t)
     for jj in kk
         ist[jj] = true
     end
@@ -1757,7 +1757,7 @@ if minimum(real(t))<tl
 end
 tl=d[ii]["breaks"][end]
 if maximum(real(t))>tl
-    kk = find(x->(x>tl),t)
+    kk = findall(x->(x>tl),t)
     for jj in kk
         ist[jj] = true
     end
@@ -1813,10 +1813,10 @@ if cb!=10#gives better accuracy for Moons, but takes ~twice time
             d2r=X[7,ii]
             d2q=X[8,ii]
             r_=d2r-rdq[ii]*dq[ii]
-            q_=r[ii]*d2q+2.*dr[ii]*dq[ii]
+            q_=r[ii]*d2q+2 .*dr[ii]*dq[ii]
             X[7:9,ii] = dcm*[r_*c[ii]-q_*s[ii]; r_*s[ii]+q_*c[ii]; X[9,ii]]
-            r_=X[10,ii]-3.*dr[ii]*dq[ii]^2-3.*rdq[ii]*d2q
-            q_=r[ii]*X[11,ii]+3.*d2r*dq[ii]+3.*dr[ii]*d2q-rdq[ii]*dq[ii]^2
+            r_=X[10,ii]-3 .*dr[ii]*dq[ii]^2-3 .*rdq[ii]*d2q
+            q_=r[ii]*X[11,ii]+3 .*d2r*dq[ii]+3 .*dr[ii]*d2q-rdq[ii]*dq[ii]^2
             X[10:12,ii] = dcm*[r_*c[ii]-q_*s[ii];r_*s[ii]+q_*c[ii]; X[12,ii]]
         end
     end
@@ -1845,7 +1845,7 @@ pp = RVspline6!(X, pp)
 is continuous acceleration and jerk for a specific body. Creates 5th, 4th, 3rd,
 and 2nd order splines.
 """
-function RVspline6!{T}(X::AbstractArray{T},pp::Dict{String,Array{Float64}})
+function RVspline6!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
 #5th order spline fiting R,V at segment endpoints, continuous A,J
 #nonuniform step ok
 t=X[1,:]
@@ -1853,8 +1853,8 @@ R=X[2:4,:]
 V=X[5:7,:]*86400
 X = 0
 n=length(t)-1
-R_ = Array{Float64}(3,n); V_ = Array{Float64}(3,n); dt = Array{Float64}(n)
-b_ = Array{Float64}(3,n)
+R_ = Array{Float64}(undef, 3,n); V_ = Array{Float64}(undef, 3,n); dt = Array{Float64}(undef, n)
+b_ = Array{Float64}(undef, 3,n)
 for ii in 1:n
     dt[ii] = t[ii+1]-t[ii]
     for jj in 1:3
@@ -1862,33 +1862,33 @@ for ii in 1:n
         V_[jj,ii]=(V[jj,ii]-V[jj,ii+1])/dt[ii]/2.
     end
 end
-#R_+c2+c3.*dt+c4.*dt2,V_+c2+3/2*c3.*dt+2*c4.*dt2,
+#R_+c2+c3 .*dt+c4.*dt2,V_+c2+3/2*c3 .*dt+2*c4.*dt2,
 #c5(i)*dt^3+6*R_-6*V_+c2(i)=c2(i+1) ,
 #     (3*c5*dt^3+8*R_-6*V_+2*c2)/dt=(c5*dt^3-4*R_+2*V_-2*c2)/dt
 #c5(i)=(6*(V_-R_)-c2(i)+c2(i+1))/dt^3 ,
 #      (12*V_-10*R_-c2(i-1)+3*c2(i))/dt=(8*V_-10*R_-3*c2(i)+c2(i+1))/dt
 #(-15*R_+16*V_-2*c2(i-1)+3*c2(i))/dt^2=(15*R_-14*V_+3*c2(i)-2*c2(i+1))/dt^2
-b = Array{Float64}(3,n-1)
-s = Array{Float64}(3*(n-1))
+b = Array{Float64}(undef, 3,n-1)
+s = Array{Float64}(undef, 3*(n-1))
 for ii in 2:n
     for jj in 1:3
-        b[jj,ii-1]=(12.*V_[jj,ii-1]-10.*R_[jj,ii-1])/dt[ii-1]-
-        (8.*V_[jj,ii]-10.*R_[jj,ii])/dt[ii]
+        b[jj,ii-1]=(12 .*V_[jj,ii-1]-10 .*R_[jj,ii-1])/dt[ii-1]-
+        (8 .*V_[jj,ii]-10 .*R_[jj,ii])/dt[ii]
     end
-    s[ii-1]= 1./dt[ii-1]
-    s[ii+n-2] = -3./dt[ii-1]-3./dt[ii]
-    s[ii+2*n-3] = 1./dt[ii]
+    s[ii-1]= 1 ./dt[ii-1]
+    s[ii+n-2] = -3 ./dt[ii-1]-3 ./dt[ii]
+    s[ii+2*n-3] = 1 ./dt[ii]
 end
 #s*[c2(i-1);c2(i);c2(i+1)]=b, tridiagonal
 ii = 2:n
-jj=[ii-1; ii; ii+1] #sparsity pattern x,y,z
+jj=[ii .- 1; ii; ii .+ 1] #sparsity pattern x,y,z
 ii=[ii; ii; ii]
 b_ = zeros(3) #continuous 4th der at 2
 for kk in 1:3
-    b_[kk]=(-15.*R_[kk,1]+16.*V_[kk,1])/dt[1]^2-
-    (15.*R_[kk,2]-14.*V_[kk,2])/dt[2]^2
+    b_[kk]=(-15 .*R_[kk,1]+16 .*V_[kk,1])/dt[1]^2-
+    (15 .*R_[kk,2]-14 .*V_[kk,2])/dt[2]^2
 end
-s_=[2./dt[1]^2; -3./dt[1]^2+3./dt[2]^2; -2./dt[2]^2]
+s_=[2 ./dt[1]^2; -3 ./dt[1]^2+3 ./dt[2]^2; -2 ./dt[2]^2]
 b=[b_ b]
 s=[s_; s]
 
@@ -1896,10 +1896,10 @@ ii=[1; 1; 1; ii]
 jj=[1; 2; 3; jj]
 b_ = zeros(3) #continuous 4th der at n
 for kk in 1:3
-    b_[kk]=(-15.*R_[kk,n-1]+16*V_[kk,n-1])/dt[n-1]^2-
-    (15.*R_[kk,n]-14.*V_[kk,n])/dt[n]^2
+    b_[kk]=(-15 .*R_[kk,n-1]+16*V_[kk,n-1])/dt[n-1]^2-
+    (15 .*R_[kk,n]-14 .*V_[kk,n])/dt[n]^2
 end
-s_=[2./dt[n-1]^2; -3./dt[n-1]^2+3./dt[n]^2; -2./dt[n]^2]
+s_=[2 ./dt[n-1]^2; -3 ./dt[n-1]^2+3 ./dt[n]^2; -2 ./dt[n]^2]
 b=[b b_]
 s=[s; s_]
 ii=[ii; n+1; n+1; n+1]
@@ -1910,15 +1910,15 @@ c2=b/s
 c22=c2[:,2:n+1]
 c2=c2[:,1:n]
 #solve for coefficients
-c5 = Array{Float64}(3,n); c3 = Array{Float64}(3,n)
-c4 = Array{Float64}(3,n)
-c0 = Array{Float64}(3,n); c1 = Array{Float64}(3,n)
+c5 = Array{Float64}(undef, 3,n); c3 = Array{Float64}(undef, 3,n)
+c4 = Array{Float64}(undef, 3,n)
+c0 = Array{Float64}(undef, 3,n); c1 = Array{Float64}(undef, 3,n)
 for ii in 1:n
     for jj in 1:3
-        c5[jj,ii] = (6.*(V_[jj,ii]-R_[jj,ii])-c2[jj,ii]+c22[jj,ii])/dt[ii]^3
+        c5[jj,ii] = (6 .*(V_[jj,ii]-R_[jj,ii])-c2[jj,ii]+c22[jj,ii])/dt[ii]^3
         c5dt3 = c5[jj,ii]*dt[ii]^3
-        c3[jj,ii]=(2.*V_[jj,ii]-4.*R_[jj,ii]-2.*c2[jj,ii]+c5dt3)/dt[ii]
-        c4[jj,ii]=(3.*R_[jj,ii]-2.*V_[jj,ii]+c2[jj,ii]-2.*c5dt3)/dt[ii]^2
+        c3[jj,ii]=(2 .*V_[jj,ii]-4 .*R_[jj,ii]-2 .*c2[jj,ii]+c5dt3)/dt[ii]
+        c4[jj,ii]=(3 .*R_[jj,ii]-2 .*V_[jj,ii]+c2[jj,ii]-2 .*c5dt3)/dt[ii]^2
         c0[jj,ii] = R[jj,ii]
         c1[jj,ii] = V[jj,ii]
     end
@@ -1942,20 +1942,20 @@ for ii in 1:length(c5)
     pp["coefs6"][ii,5] = c1[ii]
     pp["coefs6"][ii,6] = c0[ii]
 
-    pp["coefs5"][ii,1] =  5.*c5[ii]/86400.
-    pp["coefs5"][ii,2] =  4.*c4[ii]/86400.
-    pp["coefs5"][ii,3] =  3.*c3[ii]/86400.
-    pp["coefs5"][ii,4] =  2.*c2[ii]/86400.
+    pp["coefs5"][ii,1] =  5 .*c5[ii]/86400.
+    pp["coefs5"][ii,2] =  4 .*c4[ii]/86400.
+    pp["coefs5"][ii,3] =  3 .*c3[ii]/86400.
+    pp["coefs5"][ii,4] =  2 .*c2[ii]/86400.
     pp["coefs5"][ii,5] =  c1[ii]/86400.
 
-    pp["coefs4"][ii,1] = 20.*c5[ii]/86400.^2
-    pp["coefs4"][ii,2] = 12.*c4[ii]/86400.^2
-    pp["coefs4"][ii,3] = 6.*c3[ii]/86400.^2
-    pp["coefs4"][ii,4] = 2.*c2[ii]/86400.^2
+    pp["coefs4"][ii,1] = 20 .*c5[ii]/86400 .^2
+    pp["coefs4"][ii,2] = 12 .*c4[ii]/86400 .^2
+    pp["coefs4"][ii,3] = 6 .*c3[ii]/86400 .^2
+    pp["coefs4"][ii,4] = 2 .*c2[ii]/86400 .^2
 
-    pp["coefs3"][ii,1] = 60.*c5[ii]/86400.^3
-    pp["coefs3"][ii,2] = 24.*c4[ii]/86400.^3
-    pp["coefs3"][ii,3] = 6.*c3[ii]/86400.^3
+    pp["coefs3"][ii,1] = 60 .*c5[ii]/86400 .^3
+    pp["coefs3"][ii,2] = 24 .*c4[ii]/86400 .^3
+    pp["coefs3"][ii,3] = 6 .*c3[ii]/86400 .^3
 end
 return pp
 end
@@ -1968,13 +1968,13 @@ end
 # dt=repmat(diff(t),3,1);dt2=dt.*dt;
 # c0=R(:,1:end-1);c1=V(:,1:end-1);
 # R_=(c0+c1.*dt-R(:,2:end))./dt2;V_=(c1-V(:,2:end))./dt/2;
-# #R_+c2+c3.*dt+c4.*dt2,V_+c2+3/2*c3.*dt+2*c4.*dt2,6*(R_-V_)+c2(i)=c2(i+1),
+# #R_+c2+c3 .*dt+c4.*dt2,V_+c2+3/2*c3 .*dt+2*c4.*dt2,6*(R_-V_)+c2(i)=c2(i+1),
 # c2=((V_(:,2)-2*R_(:,2))./dt(:,2)-(10*R_(:,1)-9*V_(:,1))./dt(:,1)).*dt(:,1)/2;
 # RV6=6*(R_-V_);c2=cumsum([c2 RV6],2);c2=c2(:,1:end-1);
 # #c2=((V_(:,end)-2*R_(:,end))./dt(:,end)-
 # #(3*V_(:,end-1)-2*R_(:,end-1))./dt(:,end-1)).*dt(:,end-1)/2;
 # #c2=cumsum([c2 -RV6(:,end-1:-1:1)],2);c2=c2(:,end:-1:1);#/2+c2_/2;
-# c3=(V_-2*R_-c2)*2./dt;c4=(3*R_-2*V_+c2)./dt2;
+# c3=(V_-2*R_-c2)*2 ./dt;c4=(3*R_-2*V_+c2)./dt2;
 # pp.form='pp';pp.breaks=t;pp.coefs=[c4(:) c3(:) c2(:) c1(:) c0(:)];
 # pp.pieces=numel(t)-1;pp.order=5;pp.dim=3;pp.dcm=[];
 # pp(2)=pp;pp(2).coefs=[4*c4(:) 3*c3(:) 2*c2(:) c1(:)]/86400;pp(2).order=4;
@@ -1987,7 +1987,7 @@ RVAspline!(X, pp)
 acceleration with central difference of position and velocity. Creates a 6th order
 spline.
 """
-function RVAspline!{T}(X::AbstractArray{T},pp::Dict{String,Array{Float64}})
+function RVAspline!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
 #5th order spline using R,V,A at beginning and end of segments
 #approximates A with central diff of R and V
 #assumes uniform time step
@@ -2013,21 +2013,21 @@ V=V*dt
 c2 = Array{Float64}(3,n-2)#central diff for A (c2 = coeff on t^2 term)
 for ii in 1:n-2
     for jj in 1:3
-        c2[jj,ii]=R[jj,ii]-2.*R[jj,ii+1]+R[jj,ii+2]+(V[jj,ii]-V[jj,ii+2])/4
+        c2[jj,ii]=R[jj,ii]-2 .*R[jj,ii+1]+R[jj,ii+2]+(V[jj,ii]-V[jj,ii+2])/4
     end
 end
 c21 = Array{Float64}(3)#initial A (uses first 3 R,V)
 c2n = Array{Float64}(3)#final A (uses last 3 R,V)
 for jj in 1:3
-    c21[jj]=-23./4.*R[jj,1]+4.*R[jj,2]+7./4.*R[jj,3]-3.*V[jj,1]-
-    4.*V[jj,2]-V[jj,3]/2.
-    c2n[jj]=7./4.*R[jj,n-2]+4.*R[jj,n-1]-23./4.*R[jj,n]+V[jj,n-2]/2.+
-    4.*V[jj,n-1]+3.*V[jj,n]
+    c21[jj]=-23 ./4 .*R[jj,1]+4 .*R[jj,2]+7 ./4 .*R[jj,3]-3 .*V[jj,1]-
+    4 .*V[jj,2]-V[jj,3]/2.
+    c2n[jj]=7 ./4 .*R[jj,n-2]+4 .*R[jj,n-1]-23 ./4 .*R[jj,n]+V[jj,n-2]/2 .+
+    4 .*V[jj,n-1]+3 .*V[jj,n]
 end
 # coeff from initial R,V,A and temp final R,V,A on segs
 c0 = Array{Float64}(3,n-1); c1 = Array{Float64}(3,n-1)
 R2 = Array{Float64}(3,n-1); V2 = Array{Float64}(3,n-1)
-#R_+c2+c3.*dt+c4.*dt2,V_+c2+3/2*c3.*dt+2*c4.*dt2,
+#R_+c2+c3 .*dt+c4.*dt2,V_+c2+3/2*c3 .*dt+2*c4.*dt2,
 #satisfy R and V at end of segment
 #c5(i)*dt^3+6*R_-6*V_+c2(i)=c2(i+1) ,
 #(3*c5*dt^3+8*R_-6*V_+2*c2)/dt=(c5*dt^3-4*R_+2*V_-2*c2)/dt
@@ -2050,9 +2050,9 @@ for ii in 1:n-1
 end
 A2=[c2 c2n]
 c2=[c21 c2]
-c3=-10.*R2-6.*c1-4.*V2-3.*c2+A2
-c4= 15.*R2+8.*c1+7.*V2+3.*c2-2.*A2
-c5=-6.*R2-3.*c1-3.*V2-c2+A2
+c3=-10 .*R2-6 .*c1-4 .*V2-3 .*c2+A2
+c4= 15 .*R2+8 .*c1+7 .*V2+3 .*c2-2 .*A2
+c5=-6 .*R2-3 .*c1-3 .*V2-c2+A2
 c=zeros(3*n-3,6)
 # unscale time
 for jj in 1:3*n-3
@@ -2152,7 +2152,7 @@ for ibu in 1:length(bb) #match times for each unique body
         end
     end
     bib=bb[ibu]
-    tb? (t=[tt[ibu]]) : (t=tt)
+    tb ? (t=[tt[ibu]]) : (t=tt)
 
     #small body orientation not in Horizons, may be in pck file. write xx 1-to-1 if tb
     if bib>1e3
@@ -2167,7 +2167,7 @@ for ibu in 1:length(bb) #match times for each unique body
 
     #cl2 is Pole|PM|eqx output, ii is cl2 data exists, ij is any data exists
     cl2=ceil(Int,ll/2)
-    iN=find(x->(x==bib),id)
+    iN=findall(x->(x==bib),id)
     if !isempty(iN)
         T1 = size(id)
         jj = zeros(Int,length(iN)); ij = Int[]
@@ -2196,7 +2196,7 @@ for ibu in 1:length(bb) #match times for each unique body
 
         #file names
         fls=["pol" "pm" "eqx"]; err=0
-        @static is_windows()?
+        @static Sys.iswindows() ?
         (edir = string(param(dict,"bdir"),"\\ephem\\",fls[cl2],bib,".jld")) :
         (edir = string(param(dict,"bdir"),"/ephem/",fls[cl2],bib,".jld"))
         rf=!ssd && isfile(edir)
@@ -2281,7 +2281,7 @@ for ibu in 1:length(bb) #match times for each unique body
             end#cl2
         end#rf
         if any(isnan.(di[2,:])) #data to save, don't save nans
-            jj = find(isnan.(di[2,:]))
+            jj = findall(isnan.(di[2,:]))
             for kk in 1:length(jj)
                 di = [di[:,1:jj[kk]-1] di[:,1:jj[kk]+1]]
                 jj = jj -1
@@ -2346,7 +2346,7 @@ for ibu in 1:length(bb) #match times for each unique body
     #see if data is out of bounds
         tl=d[ii][cl2]["breaks"][1]
         if minimum(t)<tl
-            kk = find(x->(x<tl),t)
+            kk = findall(x->(x<tl),t)
             for jj in kk
                 ist[jj] = true
             end
@@ -2355,7 +2355,7 @@ for ibu in 1:length(bb) #match times for each unique body
         end
         tl=d[ii][cl2]["breaks"][end]
         if maximum(t)>tl
-            kk = find(x->(x>tl),t)
+            kk = findall(x->(x>tl),t)
             for jj in kk
                 ist[jj] = true
             end
@@ -2462,8 +2462,8 @@ Cubic spline that creates third order polynomials between timed segments
 segments (interpolation for data) for pole and PM calculations. Used under the
 orient function.
 """
-function spline!{P}(x::AbstractArray{P},y::AbstractArray{P},
-                pp::Dict{String,Array{Float64}})# Cubic spline with x1 <= x2 <= .. <= xn
+function spline!(x::AbstractArray{P},y::AbstractArray{P},
+                pp::Dict{String,Array{Float64}}) where P # Cubic spline with x1 <= x2 <= .. <= xn
 # x is a 1 x n or n x 1 array
 # y is a 2 X n, n X 2, 1 x n, n x 1 array
 
@@ -2544,12 +2544,12 @@ pp["coefs4"] = coefs
 end
 
 """
-X,tt.',err = mkeph(n, t, typ, dict, ll)
+X,tt_trans,err = mkeph(n, t, typ, dict, ll)
 
 Reads ephemeris data from Horizons.
 """
-function mkeph{P}(n::Int64,t::AbstractArray{Float64},typ::Bool,dict::Dict{String,Any},
-                ll::AbstractArray{P}=[])
+function mkeph(n::Int64,t::AbstractArray{Float64},typ::Bool,dict::Dict{String,Any},
+                ll::AbstractArray{P}=[]) where P
 #read from horizons
 # typ is true if t is a range of times
 err= [false; false]
@@ -2573,7 +2573,7 @@ if n<1e3 || n>1e6
         DES="DES="
         ieph=1
     else #time limits for bog bodies
-        ieph=find(x->(x==string(n)),tephf.numbers)
+        ieph=findall(x->(x==string(n)),tephf.numbers)
         tlim=tephf.tl[ieph[1],:]
         DES=""
     end
@@ -2588,7 +2588,7 @@ if n<1e3 || n>1e6
         DES="DES="
         ieph=1
     else #time limits for big bodies
-        ieph=find(x->(x==string(n)),tephf.numbers)[1]
+        ieph=findall(x->(x==string(n)),tephf.numbers)[1]
         ieph = ieph[1]
         tlim=tephf.tl[ieph,:]
         DES=""
@@ -2613,7 +2613,7 @@ if n<1e3 || n>1e6
     return X,tt,err
     end
     if minimum(tt) < tlim[1]
-        ii = find(x->(x<tlim[1]),tt)
+        ii = findall(x->(x<tlim[1]),tt)
         nt1=length(ii)
         err[1] = true
     elseif minimum(tt) >= tlim[1]
@@ -2621,7 +2621,7 @@ if n<1e3 || n>1e6
         err[1] = false
     end
     if maximum(tt) > tlim[2]
-        jj = find(x->(x>tlim[2],tt))
+        jj = findall(x->(x>tlim[2],tt))
         nt2=length(jj)
         err[2] = true
     else
@@ -2632,7 +2632,7 @@ if n<1e3 || n>1e6
     t12=round.(Int64,linspace(nt1,n2t,ceil(Int64,(n2t-nt1)/mnt)+1))
     #t12 breaks time span into different runs
     if n>1e6
-        tnow=indmin(abs.(Dates.datetime2julian(now())-2451545.-tt))
+        tnow=indmin(abs.(Dates.datetime2julian(now())-2451545 .-tt))
         t12=sort(unique([tnow-1; t12]))
     end
 
@@ -2675,14 +2675,14 @@ if n<1e3 || n>1e6
         mx = length(rd); i1 = 0; T1 = true
         while T1
             i1 = i1 + 1
-            (contains(rd[i1],"\$\$SOE")) && (T1 = false)
+            (occursin(rd[i1],"\$\$SOE")) && (T1 = false)
             (i1 == mx) && (T1 = false)
         end
         T1 = true; i2 = copy(i1)
         (i2==mx) && (T1=false)
         while T1
             i2 = i2 + 1
-            (contains(rd[i2],"\$\$EOE")) && (T1 = false)
+            (occursin(rd[i2],"\$\$EOE")) && (T1 = false)
             (i2 == mx) && (T1 = false)
         end
         clw = length(rd[1])
@@ -2769,17 +2769,18 @@ else #Lagrange point
         X = Lagrange(n,tt,dict)
 end
 
-@static is_windows()? (edir = string(param(dict,"bdir"),"\\ephem")) :
+@static Sys.iswindows() ? (edir = string(param(dict,"bdir"),"\\ephem")) :
 (edir = string(param(dict,"bdir"),"/ephem"))
 
 if !isdir(edir)
     mkdir(edir)
 end#make "ephem" directory
 if (param(dict,"save")) && (isempty(ll)) #save ephemeris data
-    @static is_windows()? (f = edir*"\\"*string(n)*".jld") :
+    @static Sys.iswindows() ? (f = edir*"\\"*string(n)*".jld") :
     (f = edir*"/"*string(n)*".jld")
     fid = jldopen(f,"w")
-    d=[tt.';X]
+    tt_trans = transpose(tt)
+    d=[tt_trans;X]
     if !typ
         d=d[:,ist]
     end
@@ -2806,7 +2807,7 @@ if (param(dict,"save")) && (isempty(ll)) #save ephemeris data
         dict)
     end
 end # save
-return X,tt.',err
+return X,tt_trans,err
 end
 
 """
@@ -2852,7 +2853,7 @@ if i<4 #L1,L2,L3
     end
     L=real(L)
     (abs(e_)>9*eps()) && (warn("Lagrange not converged"))
-    #e=m1+L-m1i./(L+1).^2-m2i./L.^2;dL=-imag(e)/1e-42./de
+    #e=m1+L-m1i./(L+1).^2-m2i./L.^2;dL=-imag(e)/1e-42 ./de
     #L=L+dL*1e-42i;X=L*ephem1(b,t+1e-42i,1);X=[real(X);imag(X)/1e-42/86400];
     X,_ = ephem1(bib,t,false,3,dict)
     X=L*X #point is along position of secondary wrt primary
@@ -2889,7 +2890,7 @@ Retrieves ephemeris header data from JPL's Solar System Dynamics database (SSD).
 function getephdat(b::Int64,dict::Dict{String,Any})
 #ephemeris header data
 ef1=getef(dict)
-ii = find(x->(x==string(b)),ef1.numbers)
+ii = findall(x->(x==string(b)),ef1.numbers)
 ef = lowercase(match(r"^[^-._ ]*",ef1.f[ii[1]]).match)
 #only need first file if merged
 ef = convert(String,ef)
@@ -2941,17 +2942,17 @@ if (isempty(ed)) && (b<400) #inner planets and barycenters
         TD = search(T1[ii+1],"D")
         T11 = parse(Float64,T1[ii+1][1:TD[1]-1])
         T1E = parse(Float64,T1[ii+1][TD[1]+1:end])
-        vals[ii] = T11*10.^T1E
+        vals[ii] = T11*10 .^T1E
     end
     ed = Dict()
     ed["vars"]=vars
     ed["vals"]=vals
     #write gm values
     au=ed["vals"][uniqstr(ed["vars"],"AU",1)]; au = au[1]
-    ed["gm10"]=ed["vals"][uniqstr(ed["vars"],"GMS")]*au^3/86400.^2 #sun
-    ed["gm3"]=ed["vals"][uniqstr(ed["vars"],"GMB")]*au^3/86400.^2 #E-M bary
+    ed["gm10"]=ed["vals"][uniqstr(ed["vars"],"GMS")]*au^3/86400 .^2 #sun
+    ed["gm3"]=ed["vals"][uniqstr(ed["vars"],"GMB")]*au^3/86400 .^2 #E-M bary
     emr=ed["vals"][uniqstr(ed["vars"],"EMRAT")]; emr = emr[1]#E/M ratio
-    ed["gm301"]=ed["gm3"]/(1.+emr);ed["gm399"]=ed["gm3"]*emr/(1.+emr);
+    ed["gm301"]=ed["gm3"]/(1 .+emr);ed["gm399"]=ed["gm3"]*emr/(1 .+emr);
     #Moon and Earth barycenters
     ed["gm0"]=ed["gm10"]+ed["gm3"]
     for ii in [1:2;4:9]
@@ -2987,9 +2988,9 @@ elseif isempty(ed) #outer planets and satellites
     end
     ii = uniqstr(fils,ef,0)
     if isempty(ii)
-        jj = find(x->(contains(x,ef)),fils)
+        jj = findall(x->(occursin(x,ef)),fils)
         (isempty(jj)) && (ii = uniqstr(fils,ef))
-        (isempty(ii))? (err = false) : (err = true)
+        (isempty(ii)) ? (err = false) : (err = true)
         if isempty(ii) # Look for the first 3 leters of the highest # file
             fils2 = Array{eltype(fils)}(size(fils))
             nf = length(fils2)
@@ -2998,7 +2999,7 @@ elseif isempty(ed) #outer planets and satellites
             end
                 ii = uniqstr(fils2,ef[1:3])
                 ii = nf - ii + 1 #
-                (isempty(ii))? (err = false) : (err = true)
+                (isempty(ii)) ? (err = false) : (err = true)
         end
         #could also check
         #ftp://ssd.jpl.nasa.gov/pub/eph/satellites/rckin/rckin.*.log,
@@ -3078,10 +3079,10 @@ if isempty(tephf.numbers)
         end
     end
     #Mercury and Venus are Trouble (no ephemeris file, but still in table)
-    jj = find(x->(x=="not"),sss[:,3])
+    jj = findall(x->(x=="not"),sss[:,3])
     for ii in jj
         warn("Potential that Mercury and Venus information not correct")
-        kk=find(x->(x==sss[ii,1]*"99"),sss[:,1])
+        kk=findall(x->(x==sss[ii,1]*"99"),sss[:,1])
         if !isempty(kk)
             sss[ii,:]=sss[kk[1],:]
             sss[ii,1]=string(sss[kk[1],1][1])
@@ -3265,10 +3266,10 @@ Pulls data from small body or major body structure.
 function getx(b1::Int64,s::String,dict::Dict{String,Any})
 #get data from mb or sb structure
 x,_=getsbmb(b1,dict)
-ii=find(y->(y==b1),x.numbers) #get datastructure and see if body is there
+ii=findall(y->(y==b1),x.numbers) #get datastructure and see if body is there
 (length(ii)==1) && (ii = ii[1])
 if (!isempty(ii))&&(!param(dict,"ssd"))&&
-    (!isempty(find(y->(y==Symbol(s)),fieldnames(x))))
+    (!isempty(findall(y->(y==Symbol(s)),fieldnames(x))))
     #see if should skip saved data and if datafield exists
     #see if entry exists in field for body
     if isempty(getfield(x,(Symbol(s))))
@@ -3332,16 +3333,16 @@ for ii in 1:length(lines) #keep 1--3 numbers, skip spaces, keep stuff until two 
     end
 end
 
-jj = find(x->(x>9),NumNam[:,1]) #match barycenters last
+jj = findall(x->(x>9),NumNam[:,1]) #match barycenters last
 nums = zeros(size(NumNam,1))
-nams = Array{AbstractString}(size(NumNam,1))
+nams = Array{AbstractString}(undef, size(NumNam,1))
 ct = 0
 for ii in jj
     nums[ct+1] = NumNam[ii,1]
     nams[ct+1] = NumNam[ii,2]
     ct = ct + 1
 end
-jj = find(x->(x<=9),NumNam[:,1])
+jj = findall(x->(x<=9),NumNam[:,1])
 for ii in jj
     nums[ii+ct] = NumNam[ii,1]
     nams[ii+ct] = NumNam[ii,2]
@@ -3352,7 +3353,7 @@ x,_=getsbmb("mb",dict)
 b=x.numbers
 jj = [] # see if body numbers already exist in data structure
 for ii in 1:length(b)
-    T1 = find(z->(z==b[ii]),nums)
+    T1 = findall(z->(z==b[ii]),nums)
     if isempty(jj)
         jj = T1
     else
@@ -3360,7 +3361,7 @@ for ii in 1:length(b)
     end
 end
 
-T1 = Array{AbstractString}(length(jj))
+T1 = Array{AbstractString}(undef, length(jj))
 ct = 0
 for ii in 1:length(jj) #put new bodies last
     splice!(nums,jj[ii]-ct)
@@ -3540,7 +3541,7 @@ elseif (bo == []) && (bi == "sb")#read from saved data
     sb = SB([],[],[],[],[],[],[],[],[],[],[])
     param(dict,"sb",sb)
 elseif (isempty(bo.Names)) || (isempty(bo.numbers))
-    @static is_windows()? (bdf = string(param(dict,"bdir"),"\\bodydata.jld")) :
+    @static Sys.iswindows() ? (bdf = string(param(dict,"bdir"),"\\bodydata.jld")) :
     (bdf = string(param(dict,"bdir"),"/bodydata.jld"))
     if isfile(bdf)
         boddict = load(bdf,"boddict") # this will give "md" or "sd" elements
@@ -3559,17 +3560,17 @@ Writes data to structure.
 function putsbmb(n,f,v,dict::Dict{String,Any})
 #write data to structure
 x,bi=getsbmb(n[1],dict) #get structure
-bb=find(z->(z==n[1]),x.numbers)
+bb=findall(z->(z==n[1]),x.numbers)
 if isempty(bb)&&length(n)>1
     n=n[2]
-    bb=find(z->(z==n),x.numbers)
+    bb=findall(z->(z==n),x.numbers)
 else
     n=n[1]
 end
 if isempty(bb) #see if body exists in field
     bb=length(x.numbers)+1
     f=["numbers" f]
-    (size(v,2) > size(v,1))? (v = [n v]) : (v = [n; v])
+    (size(v,2) > size(v,1)) ? (v = [n v]) : (v = [n; v])
 end
 
 if typeof(f) == String
@@ -3675,14 +3676,14 @@ function uniqstr(xni,bi,nb::Int64=0)
 #1 for only whole word matches, 2 for only fragment matches, 0 for either
 if typeof(xni) == String
     T1 = false
-    (contains(xni,bi)) && (T1=true)
+    (occursin(xni,bi)) && (T1=true)
 else
     T1 = falses(length(xni))
     for ii in 1:length(xni)
-        (contains(xni[ii],bi)) && (T1[ii]=true)
+        (occursin(xni[ii],bi)) && (T1[ii]=true)
     end
 end
-In = find(T1)
+In = findall(T1)
 #in=strfind(xn,[' ' bi ' ']);#whole word
 
 if (length(In) > 1) && (nb == 1) #multiple entries with same word
@@ -3691,7 +3692,7 @@ if (length(In) > 1) && (nb == 1) #multiple entries with same word
     for ii in 1:length(In)
         xm[ii] = xni[In[ii]]
     end
-    In = In[find(x->(x==bi),xm)] #exact match
+    In = In[findall(x->(x==bi),xm)] #exact match
     if length(In) > 1
         warn("identical entries")
         In = In[1]
@@ -3746,7 +3747,7 @@ end
 
 function cbfun(b::AbstractArray{Int64})
 #Calculates the central body of an array input
-cb = repmat(10,size(b))
+cb = repeat(10,size(b))
 
 for ii in 1:length(cb)
     if b[ii]>10 && b[ii] < 1000 && mod(b[ii],100)!=99
@@ -3760,7 +3761,7 @@ end
 cb
 end
 
-function cbfun{T}(b::AbstractArray{T})
+function cbfun(b::AbstractArray{T}) where T
 # Calculates the central body of an array input
 cb = 10*ones(Int64,size(real(b)))
 
@@ -3813,8 +3814,8 @@ pval!(pp, xx, order, v)
 Evaluates a polynomial by getting the coefficients from the spline and evaluating
 the polynomial over many steps. v has to be a zero input.
 """
-function pval!{T}(pp::Dict{String,Array{Float64}},xx::AbstractArray{T},
-                order::Int64,v::AbstractArray{T})
+function pval!(pp::Dict{String,Array{Float64}},xx::AbstractArray{T},
+                order::Int64,v::AbstractArray{T}) where T
 # Assumes that xx is sorted from smallest to largest
 # pp is dictionary
 # xx is a 1 x n or n x 1
@@ -3825,7 +3826,7 @@ b = pp["breaks"]
 lb = length(b)
 c = pp[string("coefs",order)]
 k = order
-(size(v,2)==lx)? (sizev = size(v,1)) : (sizev = size(v,2))
+(size(v,2)==lx) ? (sizev = size(v,1)) : (sizev = size(v,2))
 
 index = zeros(Int64,lx)
 
@@ -3847,8 +3848,8 @@ for ii in 1:lx
 end
 end
 
-function pval!{T}(pp::Dict{String,Array{Float64}},xx::AbstractArray{T},
-                order::Int64,v::AbstractArray{T},ll::Int64)
+function pval!(pp::Dict{String,Array{Float64}},xx::AbstractArray{T},
+                order::Int64,v::AbstractArray{T},ll::Int64) where T
 # For evaluationg pole and PM splines
 # PM and pole splines are ordered by first element wrt to time and then second
 # pp is dictionary
@@ -3860,7 +3861,7 @@ b = pp["breaks"]
 lb = length(b)
 c = pp[string("coefs",order)]
 k = order
-(size(v,2)==lx)? (sizev = size(v,1)) : (sizev = size(v,2))
+(size(v,2)==lx) ? (sizev = size(v,1)) : (sizev = size(v,2))
 
 index = zeros(Int64,lx)
 
@@ -3887,7 +3888,7 @@ a = getfn(fn, b, dict)
 
 Relates desired input to designated function resulting in desired output.
 """
-function getfn{T}(fn::String,b::AbstractArray{T},dict::Dict{String,Any})
+function getfn(fn::String,b::AbstractArray{T},dict::Dict{String,Any}) where T
 a = []
 if (fn == "gm") || (fn=="GM")
     a = getgm(b,dict)
@@ -3913,7 +3914,7 @@ end
 return a
 end
 
-type MB
+mutable struct MB
     Names::AbstractArray{String}
     numbers::AbstractArray{Int64}
     gm::AbstractArray{Float64}
@@ -3926,7 +3927,7 @@ type MB
     tri::AbstractArray{Float64}
 end
 
-type SB
+mutable struct SB
     Names::AbstractArray{String}
     numbers::AbstractArray{Int64}
     gm::AbstractArray{Float64}
@@ -3941,7 +3942,7 @@ type SB
     tri::AbstractArray{Float64}
 end
 
-type TEPHF
+mutable struct TEPHF
     numbers::AbstractArray{String}
     f::AbstractArray{String}
     tl::AbstractArray{Float64}
