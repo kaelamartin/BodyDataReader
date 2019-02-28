@@ -1,0 +1,52 @@
+# Check if asteroid data file exists in current directory
+if isfile("asteroids")
+    # Open the file
+    f = open("asteroids");
+    rd = readlines(f);
+    close(f)
+else
+    # Extract updated asteroid data from DAMIT
+    ext_data = download("http://astro.troja.mff.cuni.cz/projects/asteroids3D/php/db_export_extended.php", "asteroids");
+    # Open the file
+    f = open("asteroids");
+    rd = readlines(f);
+    close(f)
+end
+
+k = ["aster_id",
+     "aster_num",
+     "aster_name",
+     "aster_desig",
+     "aster_comment",
+     "model_id",
+     "lambda",
+     "beta",
+     "period",
+     "yorp",
+     "jd0",
+     "phi0",
+     "used_model",
+     "model_p1",
+     "model_p2",
+     "model_p3",
+     "model_p4",
+     "model_p5",
+     "calib_size",
+     "equiv_d",
+     "equiv_d_err",
+     "ref_id",
+     "ref_id_obs",
+     "therm_i",
+     "therm_imin",
+     "therm_imax",
+     "vis_geo_alb",
+     "vis_geo_alb_err",
+     "op_crater_ang",
+     "a_dens_crater",
+     "qual_flag" ,
+     "model_ver",
+     "model_comment"]
+
+# Create list of properties according to DAMIT
+prop_list_parse = collect(m.match for m in eachmatch(r"(\"(.*?)\",)|(\"(.*?)\")|(,)", rd[1]))
+prop_list = [strip(thing, ['\"', '\\', ',']) for thing in prop_list_parse]

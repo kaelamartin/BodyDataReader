@@ -1,9 +1,9 @@
 """
-vargout = astermod(aster, prop)
+vargout = astermod("aster", "prop")
 
 Uses inputs to find requested asteroid shape model properties.
 """
-function astermod(aster::Any, prop::String)
+function astermod(aster::String, prop::String)
     # Asteroid data from Database of Asteroid Models from Inversion Techniques (DAMIT),
     #     http://astro.troja.mff.cuni.cz/projects/asteroids3D/web.php?page=db_export
 
@@ -119,5 +119,6 @@ return vargout
     # TODO: add error if fields do not match the database (pairs, etc.)
     # TODO: add capability of requesting multiple properties for a single asteroid
     # TODO: add capability of calling multiple asteroids for a single (or multiple) properties
+    # TODO: use DAMIT's order of properties in case it is updated in future
 
 end
