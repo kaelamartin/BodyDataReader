@@ -201,7 +201,7 @@ function ephem(body::Int64, time::Float64, type::EphemType, dict::Dict{String,An
             td = di[1,:]
             R = di[2:4,:]
             V = di[5:7,:]
-            H = zeros(3, size(R, 2))
+            H = Array{Float64}(undef, 3, size(R, 2))
             for ii in 1:size(R,2)
                 T = cross(R[:,ii],V[:,ii])
                 H[:,ii] = T/sqrt(dot(T,T))
@@ -283,7 +283,7 @@ function ephem(body::Int64, time::Float64, type::EphemType, dict::Dict{String,An
 
     if !ist # We're on the spline
 
-        X = zeros(Float64, n)
+        X = Array{Float64}(undef, n)
         if type != velocity || cb != 10 # Populate position
             pval!(d[body], [time], 6, view(X, 1:3))
         end
@@ -483,7 +483,7 @@ function makeephem(body::Integer, time::AbstractArray{Float64, 1}, type::TimeTyp
                     X1 = readdlm(s,skipstart=i1,use_mmap=false,skipblanks=true,
                     dims=(mx,clw))
                     X1 = X1[1:i2-i1-1,1:3]
-                    XT = zeros(7)
+                    XT = Array{Float64}(undef, 7)
                     for ii in 1:floor(Int64,size(X1,1)/3)
                         XT[1] = X1[3*ii-2,1]
                         XT[2] = X1[3*ii-1,1]
@@ -498,7 +498,7 @@ function makeephem(body::Integer, time::AbstractArray{Float64, 1}, type::TimeTyp
                     X1 = readlines(s)
                     X1 = X1[i1+1:i2-1]
                     nl = div(i2-i1-1,3)
-                    XT = zeros(7)
+                    XT = Array{Float64}(undef, 7)
                     for ii in 1:nl
                         XT[1] = Meta.parse(collect(m.match for m = eachmatch(r"[^ =]+",X1[3*ii-2],overlap = overlap))[1])
                         T1 = collect(m.match for m = eachmatch(r"[^ =]+",X1[3*ii-1],overlap=false))
@@ -714,7 +714,7 @@ function getephdata(body::Int64,dict::Dict{String,Any})
         end
 
         T1 = split(rd[jj[end]+1:kk[1]-1])  #read in variable names (each 6 chars)
-        vals = zeros(length(T1)-1)
+        vals = Array{Float64}(undef, length(T1)-1)
         for ii in 1:length(T1)-1
             TD = something(findfirst("D",T1[ii+1]), 0:-1)
             T11 = parse(Float64,T1[ii+1][1:TD[1]-1])

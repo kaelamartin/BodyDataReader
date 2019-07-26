@@ -8,6 +8,9 @@ function pole(body::Int64, timeRange::AbstractArray{Float64},dict::Dict{String,A
     for k in 1:length(timeRange)
         time = timeRange[k]
         poleArr[:,k] = pole(body, time, dict)
+        if isnan(poleArr[1,k]) # In case of undefined orientations
+            return NaN*ones(3,1)
+        end
     end
     return poleArr
 end
@@ -52,6 +55,10 @@ function pole(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1
             sp = falses(size(X,2))
 
             for kk in 1:size(X,2)
+                if isnan(X[1, kk])
+                    @warn "No pole data available for $body"
+                    return NaN*ones(3)
+                end
                 (X[3,kk]<0) && (sp[kk]=true)
             end
 
@@ -133,7 +140,7 @@ function pole(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1
         T1 = zeros(2,1)
         pvalorient!(d[body]["pole_data"],[time],4,T1)
         #get new pole data if not already in spline
-        X = zeros(3) #pole vector
+        X = Array{Float64}(undef, 3) #pole vector
         X[1:2,:] = T1
         p12 = 0
         p12 = X[1]^2 + X[2]^2
@@ -172,6 +179,9 @@ function pm(body::Int64, timeRange::AbstractArray{Float64},dict::Dict{String,Any
     for k in 1:length(timeRange)
         time = timeRange[k]
         pmArr[:,k] = pm(body, time, dict)
+        if isnan(pmArr[1,k])
+            return NaN*ones(3,1)
+        end
     end
     return pmArr
 end
@@ -219,13 +229,24 @@ function pm(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1}
                 P = pole(body, time, dict)
             end
 
+            if isnan(P[1,1]) # Not guaranteed protection, but doesn't impact performance much
+                @warn "No prime meridian data available for $body"
+                return NaN*ones(3)
+            end
+
             X = X[1:3,:]
             for kk in 1:size(X,2) #unit vector
+                if isnan(X[1, kk])
+                    @warn "No prime meridian data available for $body"
+                    return NaN*ones(3)
+                end
                 Xmag = sqrt(dot(X[1:3,kk],X[1:3,kk]))
                 X[1:3,kk]=X[1:3,kk]/Xmag
             end
 
-            N = zeros(3,size(P,2)); Q = zeros(3,size(P,2)); w = zeros(size(P,2))
+            N = Array{Float64}(undef, 3, size(P,2))
+            Q = Array{Float64}(undef, 3, size(P,2))
+            w = Array{Float64}(undef, size(P,2))
             for jj in 1:size(P,2)
                 p12=sqrt(P[1,jj]^2+P[2,jj]^2)
                 N[:,jj]=[P[2,jj]/p12; -P[1,jj]/p12; 0]
@@ -309,7 +330,7 @@ function pm(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1}
         else
             T1 = zeros(2,1)
             pvalorient!(d[body]["pole_data"],[time],4,T1)
-            P = zeros(3); P[1:2] = T1
+            P = Array{Float64}(undef, 3); P[1:2] = T1
         end
 
         p12 = 0
@@ -318,7 +339,7 @@ function pm(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1}
 
         #X is pole node: Pole x [0;0;1]
         p12 = sqrt(p12)
-        X = zeros(3,1)
+        X = Array{Float64}(undef, 3, 1)
         X[1] = P[2]/p12
         X[2] = -P[1]/p12
         X[3] = 0
@@ -363,6 +384,9 @@ function eqx(body::Int64, timeRange::AbstractArray{Float64},dict::Dict{String,An
     for k in 1:length(timeRange)
         time = timeRange[k]
         eqxArr[:,k] = eqx(body, time, dict)
+        if isnan(exqArr[1,k])
+            return NaN*ones(3,1)
+        end
     end
     return eqxArr
 end
@@ -409,7 +433,13 @@ function eqx(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1}
             cb = getcb(body)
             ephem!([body; cb], te, state, dict, X_)
             P = pole(body,te,dict)
-            X = zeros(3,size(X_,2)) #equinox
+
+            if isnan(P[1,1]) # Not guaranteed protection, but doesn't impact performance much
+                @warn "No equinox data available for $body"
+                return NaN*ones(3)
+            end
+
+            X = Array{Float64}(undef, 3, size(X_,2)) #equinox
             for kk in 1:size(X_,2)
                 X[:,kk] = cross(P[:,kk],cross(X_[1:3,kk],X_[4:6,kk]))
             end
@@ -420,7 +450,9 @@ function eqx(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1}
                 X[1:3,kk]=X[1:3,kk]/Xmag
             end
 
-            N = zeros(3,size(P,2)); Q = zeros(3,size(P,2)); w = zeros(size(P,2))
+            N = Array{Float64}(undef, 3, size(P,2));
+            Q = Array{Float64}(undef, 3,size(P,2));
+            w = Array{Float64}(undef, size(P,2))
             for jj in 1:size(P,2)
                 p12=sqrt(P[1,jj]^2+P[2,jj]^2)
                 N[:,jj]=[P[2,jj]/p12; -P[1,jj]/p12; 0]
@@ -505,7 +537,7 @@ function eqx(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1}
         else
             T1 = zeros(2,1)
             pvalorient!(d[body]["pole_data"],[time],4,T1)
-            P = zeros(3); P[1:2] = T1
+            P = Array{Float64}(undef, 3); P[1:2] = T1
         end
         #get new pole data if not already in spline
         p12 = 0
@@ -513,7 +545,7 @@ function eqx(body::Int64,time::Float64,dict::Dict{String,Any})::Array{Float64,1}
         P[3] = sqrt(1-p12)
 
         p12 = sqrt(p12)
-        X = zeros(3) #pole vector
+        X = Array{Float64}(undef, 3) #pole vector
         X[1] = P[2]/p12
         X[2] = -P[1]/p12
         X[3] = 0
@@ -597,7 +629,7 @@ function qpm(body::Int64, time::Float64, dict::Dict{String,Any})::Array{Float64,
     T1 = getrotperiod(body,dict)
     w = pp[4]+2*pi/T1[1]*time
     #rotate along pole
-    T1 = X; X = zeros(3,1); T2 = P;
+    T1 = X; X = Array{Float64}(undef, 3, 1); T2 = P;
     X = T1*cos(w)+cross(T2,T1)*sin(w)
 
     return X
@@ -638,7 +670,7 @@ function qeqx(body::Int64, dict::Dict{String,Any})::Array{Float64,1}
     w=pp[5]
 
     #rotate along pole
-    T1 = X; X = zeros(3,1); T2 = P
+    T1 = X; X = Array{Float64}(undef, 3, 1); T2 = P
     X = T1*cos(w)+cross(T2,T1)*sin(w)
 
     return X
@@ -695,7 +727,7 @@ function populatepp(body::Int64,dict::Dict{String,Any})::Array{Float64,1}
         putsbmb(body,"pp",[pp],dict)
     else
         @warn "no analytic orientation data found for $body"
-        pp=NaN*ones(5)
+        return NaN*ones(5)
     end
 
     return pp
