@@ -699,8 +699,8 @@ function getephdata(body::Int64,dict::Dict{String,Any})
         client = FTP(efdir)
         dir = readdir(client)
         header = dir[end-1] # Header is always second to last file
-        close(client)
-        s = download(efdir*header)
+        s = download(client, header)
+		close(client)
         f = open(s); rd = read(f, String); close(f)
         rm(s)
 
@@ -759,7 +759,6 @@ function getephdata(body::Int64,dict::Dict{String,Any})
 
         client = FTP("ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/")
         dir = readdir(client)
-        close(client)
         rd = join(dir, " ")
 
         if rd[1]!='<'
@@ -796,8 +795,7 @@ function getephdata(body::Int64,dict::Dict{String,Any})
 
         if err
 
-            s =  download("ftp://ssd.jpl.nasa.gov/pub/eph/satellites/nio/LINUX_PC/"
-            *fils[ii[1]]*".txt")
+            s =  download(client, fils[ii[1]]*".txt")
             f = open(s); rd = read(f, String); close(f)
             rm(s)
 
@@ -830,6 +828,7 @@ function getephdata(body::Int64,dict::Dict{String,Any})
             @warn "ephemeris header file $ef for $body not found"
         end#err
         param(dict,ef,ed)
+		close(client)
     end
     return ed
 end
