@@ -12,7 +12,7 @@ BodyDataReader provides two ways to retrieve desired data
 `boddat` is the easiest way to retrieve data using BodyDataReader. Generally, `boddat` is suitable for use in code without great performance concerns and retrieving data of interest to the user from the REPL.
 
 Using `boddat` comes with significant overhead and thus it is recommended to use direct function calls in performance-centric applications. 
-However, here are tasks that `boddat` automatically performs that the user must instead perform when calling functions directly.
+However, there are tasks that `boddat` automatically performs that the user must instead perform when calling functions directly.
 
 # Using `boddat`
 
