@@ -14,7 +14,9 @@ Pkg.add("BodyDataReader")
 
 ## Documentation
 
+Take a look at the [manual](doc/Manual.md) for an explanation of how to use BodyDataReader.
 
+More in-depth information can be found the [reference](doc/Reference.md).
 
 ## Quick Start
 
