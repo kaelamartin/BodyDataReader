@@ -700,9 +700,8 @@ function getephdata(body::Int64,dict::Dict{String,Any})
         dir = readdir(client)
         header = dir[end-1] # Header is always second to last file
         s = download(client, header)
-		close(client)
-        f = open(s); rd = read(f, String); close(f)
-        rm(s)
+        rd = read(s, String); close(s)
+        close(client)
 
         ii= something(findfirst("GROUP   1040",rd), 0:-1)
         jj = something(findfirst("GROUP   1041",rd), 0:-1)
@@ -796,8 +795,7 @@ function getephdata(body::Int64,dict::Dict{String,Any})
         if err
 
             s =  download(client, fils[ii[1]]*".txt")
-            f = open(s); rd = read(f, String); close(f)
-            rm(s)
+            rd = read(s, String); close(s)
 
             #s is ephemeris header file
             #get GM from "Bodies on the File" table: skip space,keep 3 #s,
