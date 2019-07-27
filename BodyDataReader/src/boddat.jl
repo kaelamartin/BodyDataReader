@@ -246,7 +246,7 @@ function boddat(bvar::AbstractString,bi::AbstractArray{Int64, 1},
     else #20--31 is orientation
         fn = param(dict,"bva")
         fn = fn[bvi]
-        a = boddatorient!(fn, b[1], dict, t, false)
+        a = boddatorient(fn, b[1], dict, t, false)
     end#if bvi<5
     varargout = a #write output to varargout
 
@@ -331,7 +331,7 @@ Retrieves the requested orientation parameter.
 Recognized parameters are "Pole", "pm", "eqx", "Poledcm", "pmdcm", and "eqxdcm",
 as well as their equivalent quick versions.
 """
-function boddatorient!(parameter::String, body::Int64, dict::Dict{String,Any},
+function boddatorient(parameter::String, body::Int64, dict::Dict{String,Any},
      time::Float64 = -Inf64, save::Bool = true)::Array{Float64, 1}
 
      if isempty(dict)
@@ -398,7 +398,7 @@ Time range MUST be supplied for this function.
 Recognized parameters are "Pole", "pm", "eqx", "Poledcm", "pmdcm", and "eqxdcm".
 Quick versions are not supported by this function.
 """
-function boddatorient!(parameter::String, body::Int64, dict::Dict{String,Any},
+function boddatorient(parameter::String, body::Int64, dict::Dict{String,Any},
      timeRange::AbstractArray{Float64}, save::Bool = true)::Array{Float64, 2}
 
      if isempty(dict)

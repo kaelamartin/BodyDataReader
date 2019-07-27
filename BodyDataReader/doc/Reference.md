@@ -67,7 +67,7 @@ Returns the triaxial radii of `body` in km.
 
 Returns the rotation period of `body` in solar days.
 
-`cb::Integer = getcb(body)`
+`cb::Integer = getcb(body::Integer)`
 
 Returns the central body of `body`.
 

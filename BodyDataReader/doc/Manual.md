@@ -40,13 +40,13 @@ Every one of these tasks except 5 are superflous to the task of retrieving the r
 
 # Direct Function Calls
 
-Direct function calls are far more efficient for retrieving data, compared to using `boddat` because they eliminate overhead, or allow the user to batch significant amounts of overhead.
+Direct function calls are far more efficient for retrieving data compared to using `boddat` because they eliminate overhead, or allow the user to batch significant amounts of overhead.
 
 The primary task that the user must perform when using direct function calls compared to `boddat` is managing the dictionary directly. Generally, use of BodyDataReader without `boddat` follows this flow:
 
-  1. User creates a new dictionary and populates it either by loading the old dictionary into it or populating it empty.
-  2. User makes various calls to BodyDataReader functions.
-  3. User saves the dictionary for later sessions.
+  1. A new dictionary is created and populated it either by loading the old dictionary into it or populating it empty.
+  2. Various calls to BodyDataReader functions are made.
+  3. The dictionary is saved for later sessions.
   
 BodyDataReader provides three functions for manipulating dictionaries to use with functions: `gendict!`, `tryloaddict!`, and `savedict`.
 
@@ -81,7 +81,7 @@ Time dependent commands generally have the following form:
 function(body, time or time range, dict)
 ```
 
-Some functions, notably ephemeris commands, have additional arguments that are required. Consult Reference.md for more information.
+Some functions, notably ephemeris commands, have additional arguments that are required. Consult the [reference](doc/Reference.md) for information on available functions.
 
 # Notes
 

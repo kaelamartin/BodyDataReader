@@ -13,8 +13,8 @@ function RVspline6!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
     X[5:7,:] *= 86400
     V = view(X, 5:7, :)
     n = size(X, 2) - 1
-    R_ = Array{Float64}(undef, 3,n); V_ = Array{Float64}(undef, 3,n); dt = Array{Float64}(undef, n)
-    b_ = Array{Float64}(undef, 3,n)
+    R_ = Array{Float64}(undef, 3, n); V_ = Array{Float64}(undef, 3, n); dt = Array{Float64}(undef, n)
+    b_ = Array{Float64}(undef, 3, n)
     for ii in 1:n
         dt[ii] = t[ii+1]-t[ii]
         for jj in 1:3
@@ -22,7 +22,7 @@ function RVspline6!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
             V_[jj,ii]=(V[jj,ii]-V[jj,ii+1])/dt[ii]/2.
         end
     end
-    b = Array{Float64}(undef, 3,n-1)
+    b = Array{Float64}(undef, 3, n-1)
     s = Array{Float64}(undef, 3*(n-1))
     for ii in 2:n
         for jj in 1:3
@@ -33,11 +33,10 @@ function RVspline6!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
         s[ii+n-2] = -3 ./dt[ii-1]-3 ./dt[ii]
         s[ii+2*n-3] = 1 ./dt[ii]
     end
-    #s*[c2(i-1);c2(i);c2(i+1)]=b, tridiagonal
     ii = 2:n
     jj=[ii .- 1; ii; ii .+ 1] #sparsity pattern x,y,z
     ii=[ii; ii; ii]
-    b_ = zeros(3) #continuous 4th der at 2
+    b_ = Array{Float64}(undef, 3) #continuous 4th der at 2
     for kk in 1:3
         b_[kk]=(-15 .*R_[kk,1]+16 .*V_[kk,1])/dt[1]^2-
         (15 .*R_[kk,2]-14 .*V_[kk,2])/dt[2]^2
@@ -48,7 +47,7 @@ function RVspline6!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
 
     ii=[1; 1; 1; ii]
     jj=[1; 2; 3; jj]
-    b_ = zeros(3) #continuous 4th der at n
+    b_ = Array{Float64}(undef, 3) #continuous 4th der at n
     for kk in 1:3
         b_[kk]=(-15 .*R_[kk,n-1]+16*V_[kk,n-1])/dt[n-1]^2-
         (15 .*R_[kk,n]-14 .*V_[kk,n])/dt[n]^2
@@ -84,10 +83,10 @@ function RVspline6!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
     pp["dcm4"] = Float64[]
     pp["dcm3"] = Float64[]
     #derivatives
-    pp["coefs6"] = zeros(length(c5),6)
-    pp["coefs5"] = zeros(length(c5),5)
-    pp["coefs4"] = zeros(length(c5),4)
-    pp["coefs3"] = zeros(length(c5),3)
+    pp["coefs6"] = Array{Float64}(undef, length(c5), 6)
+    pp["coefs5"] = Array{Float64}(undef, length(c5), 5)
+    pp["coefs4"] = Array{Float64}(undef, length(c5), 4)
+    pp["coefs3"] = Array{Float64}(undef, length(c5), 3)
     for ii in 1:length(c5)
         pp["coefs6"][ii,1] = c5[ii]
         pp["coefs6"][ii,2] = c4[ii]
@@ -177,7 +176,7 @@ function RVAspline!(X::AbstractArray{T},pp::Dict{String,Array{Float64}}) where T
     c3=-10 .*R2-6 .*c1-4 .*V2-3 .*c2+A2
     c4= 15 .*R2+8 .*c1+7 .*V2+3 .*c2-2 .*A2
     c5=-6 .*R2-3 .*c1-3 .*V2-c2+A2
-    c=zeros(3*n-3,6)
+    c=Array{Float64}(undef, 3*n-3, 6)
     # unscale time
     for jj in 1:3*n-3
         c[jj,6]=c0[jj]
@@ -216,7 +215,7 @@ function spline!(x::AbstractArray{P},y::AbstractArray{P},
     n = length(x)
 
     # values in tridiagonal
-    av = zeros(n-1); bv = zeros(n); cv = zeros(n-1)
+    av = Array{Float64}(undef, n-1); bv = Array{Float64}(undef, n); cv = Array{Float64}(undef, n-1)
     cv[1] = x[3]-x[1]
     bv[1] = dx[2]; bv[n] = dx[n-2]
     av[n-1] = x[n] - x[n-2]
@@ -230,7 +229,7 @@ function spline!(x::AbstractArray{P},y::AbstractArray{P},
 
     # Create vector so that A D = C
     if size(y,2) == 2
-        C = zeros(n,2)
+        C = Array{Float64}(undef, n, 2)
         C[1,1] = ((dx[1]+2*(x[3]-x[1]))*dx[2]*dy[1,1]/dx[1]+
             dx[1]^2*dy[2,1]/dx[2])/(x[3]-x[1])
         C[1,2] = ((dx[1]+2*(x[3]-x[1]))*dx[2]*dy[1,2]/dx[1]+
@@ -246,7 +245,7 @@ function spline!(x::AbstractArray{P},y::AbstractArray{P},
 
         D = \(A,C)
         # Determine the coefficients of the third order polynomial
-        coefs = zeros(2*(n-1),4)
+        coefs = Array{Float64}(undef, 2*(n-1), 4)
         for jj in 1:n-1
             coefs[jj,4] = y[jj,1]
             coefs[n-1+jj,4] = y[jj,2]
@@ -258,7 +257,7 @@ function spline!(x::AbstractArray{P},y::AbstractArray{P},
             coefs[n-1+jj,1] = -2*dy[jj,2]/dx[jj]^3 + D[jj,2]/dx[jj]^2 + D[jj+1,2]/dx[jj]^2
         end
     elseif size(y,2) == 1
-        C = zeros(n)
+        C = Array{Float64}(undef, n)
         C[1] = ((dx[1]+2*(x[3]-x[1]))*dx[2]*dy[1,1]/dx[1]+
             dx[1]^2*dy[2,1]/dx[2])/(x[3]-x[1])
         C[end] = (dx[n-1]^2*dy[n-2,1]/dx[n-2]+
@@ -269,7 +268,7 @@ function spline!(x::AbstractArray{P},y::AbstractArray{P},
         D = \(A,C)
 
         # Determine the coefficients of the third order polynomial
-        coefs = zeros(n-1,4)
+        coefs = Array{Float64}(undef, n-1, 4)
         for jj in 1:n-1
             coefs[jj,4] = y[jj]
             coefs[jj,3] = D[jj]
@@ -304,7 +303,7 @@ function pval!(pp::Dict{String,Array{Float64}},xx::AbstractArray{T},
     k = order
     (size(v,2)==lx) ? (sizev = size(v,1)) : (sizev = size(v,2))
 
-    index = zeros(Int64, lx)
+    index = Array{Int64}(undef, lx)
 
     for ii in 1:lx
         index[ii] = searchsortedlast(b,real(xs[ii]))
@@ -339,7 +338,7 @@ function pvalorient!(pp::Dict{String,Array{Float64}},xx::AbstractArray{T},
     k = order
     (size(v,2)==lx) ? (sizev = size(v,1)) : (sizev = size(v,2))
 
-    index = zeros(Int64,lx)
+    index = Array{Int64}(undef, lx)
 
     for ii in 1:lx
         index[ii] = searchsortedlast(b,real(xs[ii]))
