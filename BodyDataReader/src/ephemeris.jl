@@ -283,7 +283,7 @@ function ephem(body::Int64, time::Float64, type::EphemType, dict::Dict{String,An
 
     if !ist # We're on the spline
 
-        X = Array{Float64}(undef, n)
+        X = zeros(n)
         if type != velocity || cb != 10 # Populate position
             pval!(d[body], [time], 6, view(X, 1:3))
         end
@@ -329,6 +329,7 @@ function ephem(body::Int64, time::Float64, type::EphemType, dict::Dict{String,An
         X,_,_ = makeephem(body, [time], single, dict)
         param(dict,"save",sav)
     end
+
     return X
 end
 
