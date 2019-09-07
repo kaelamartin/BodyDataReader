@@ -66,7 +66,8 @@ export getmagnitude,
 
 include("ephemeris.jl")
 
-export getreference,
+export replaceephemdata,
+	   getreference,
 	   getdate,
 	   ephem!,
 	   ephem,

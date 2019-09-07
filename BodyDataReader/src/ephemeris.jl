@@ -18,6 +18,47 @@ mutable struct TEPHF
 end
 
 """
+    replaceephemdata(body, beginTime, endTime, dict, spacing)
+
+Replaces the currently downloaded ephemeris data for a given body with ephemeris
+data for the given time range.
+
+By default, ephemeris data for bodies is downloaded from January 1, 2000 to
+December 31, 2049, which is the largest time range that Horizons guarantees data
+for. For many bodies, data is available beyond this range. If data is needed
+beyond the default range, it is much faster to request new ephemeris data to be
+downloaded with this command first.
+
+Check Horizons for available time ranges. This command will always delete
+downloaded data, but will fail to download new data if invalid time data is
+provided.
+"""
+function replaceephemdata(body::Int64, beginTime::Float64, endTime::Float64, dict::Dict{String,Any}, spacing::Float64 = -Inf64)
+
+    @static Sys.iswindows() ?
+    (efile = param(dict,"bdir")*"\\ephem\\"*string(body)*".jld2") :
+    (efile = param(dict,"bdir")*"/ephem/"*string(body)*".jld2")
+
+    if isfile(efile)
+        rm(efile);
+    end
+
+    if spacing == -Inf64
+        cb = getcb(body)
+        te = [beginTime, endTime, 0.1 + 0.4*(cb==10) + 0.5*(body > 1e6)]
+    elseif spacing <= 0
+        @error "Invalid time point spacing $spacing"
+        return nothing
+    else
+        te = [beginTime, endTime, spacing]
+    end
+    makeephem(body, te, multiple, dict)
+
+    return nothing
+
+end
+
+"""
 	reference = getreference(body, dict)
 
 Retrieves the ephemeris reference for the given body. If no cached ephemeris

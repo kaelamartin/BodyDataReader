@@ -136,6 +136,12 @@ Returns the reference file for the ephemeris file of `body`.
 
 Returns the date of ephemeris retrieval for `body`.
 
+An additional command is provided for fast data retrieval beyond 2050. All ephemeris data is by default retrieved for the time range of January 1, 2000 to December 31, 2049, as data is guaranteed in this range from Horizons.
+
+`replaceephemdata(body::Int64, beginTime::Float64, endTime::Float64, dict::Dict{String,Any})`
+
+The existing downloaded ephemeris file will be replaced with new data as specified by the arguments. Note that this command will fail if data is requested beyond what is available from Horizons.
+
 # Orientation Retrieval
 
 ```
