@@ -398,7 +398,7 @@ function makeephem(body::Integer, time::AbstractArray{Float64, 1}, type::TimeTyp
         tephf = getephtime(dict) #get ephemeris time span
 
         if body > 1e6 && body < 2e6 #comets are dumb
-            CAP = "#3BCAP"
+            CAP = "%3BCAP"
         else
             CAP = ""
         end
@@ -542,7 +542,7 @@ function makeephem(body::Integer, time::AbstractArray{Float64, 1}, type::TimeTyp
                     nl = div(i2-i1-1,3)
                     XT = Array{Float64}(undef, 7)
                     for ii in 1:nl
-                        XT[1] = Meta.parse(collect(m.match for m = eachmatch(r"[^ =]+",X1[3*ii-2],overlap = overlap))[1])
+                        XT[1] = Meta.parse(collect(m.match for m = eachmatch(r"[^ =]+",X1[3*ii-2],overlap=false))[1])
                         T1 = collect(m.match for m = eachmatch(r"[^ =]+",X1[3*ii-1],overlap=false))
                         XT[2] = Meta.parse(T1[2])
                         XT[3] = Meta.parse(T1[4])
