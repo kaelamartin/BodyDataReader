@@ -163,10 +163,19 @@ Retrieves the pole dcm vector of the inputted body at the given time.
 """
 function poledcm(body::Int64, time::Float64, dict::Dict{String,Any})::Array{Float64, 1}
     #DCM is [Node;Q;Pole] where Node=cross([0;0;1],Pole), Q=cross(Pole,Node)
-    Pole = pole(body, time, dict)
-    Node = cross([0;0;1],Pole)
-    Q = cross(Pole, Node)
-    return [Node;Q;Pole]
+    if body == 399
+	Pole = pole(body,time,dict)
+	p12 = norm(Pole[1:2])
+	Node = [Pole[2]./p12;-Pole[1]./p12;0]
+	Q = cross(Pole,Node)
+	return [Node;Q;Pole]
+    else
+	Pole = pole(body,time, dict)
+	Pole399 = pole(399,time,dict)
+	Node = cross(Pole399,Pole)/norm(cross(Pole399,Pole))
+	Q = cross(Pole, Node)
+	return [Node;Q;Pole]
+    end
 end
 
 """
@@ -601,10 +610,19 @@ Quickly approximates the pole dcm vector of the inputted body at the given time.
 """
 function qpoledcm(body::Int64, dict::Dict{String,Any})::Array{Float64, 1}
     #DCM is [Node;Q;Pole] where Node=cross([0;0;1],Pole), Q=cross(Pole,Node)
-    Pole = qpole(body, dict)
-    Node = cross([0;0;1],Pole)
-    Q = cross(Pole, Node)
-    return [Node;Q;Pole]
+    if body == 399 
+	Pole = qpole(body,dict)
+	p12 = norm(Pole[1:2])
+	Node = [Pole[2]./p12;-Pole[1]./p12;0]
+	Q = cross(Pole,Node)
+	return [Node;Q;Pole]
+    else
+	Pole = qpole(body,dict)
+	Pole399 = qpole(399,dict)
+	Node = cross(Pole399,Pole)/norm(cross(Pole399,Pole))
+	Q = cross(Pole, Node)
+	return [Node;Q;Pole]
+    end
 end
 
 """
