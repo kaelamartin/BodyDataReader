@@ -382,6 +382,7 @@ function boddatorient(parameter::String, body::Int64, dict::Dict{String,Any},
          elseif(func == "pm")
              result = qpm(body, time, dict)
          elseif(func == "eqx")
+	     @warn "May not be accurate for small bodies. Recommended to use eqx function for small bodies"		
              result = qeqx(body, dict)
          elseif(func == "poledcm")
              result = qpoledcm(body, dict)
